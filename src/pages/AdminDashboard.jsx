@@ -3,16 +3,46 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { supabase } from '../services/supabaseClient';
 
+// مكون العداد التنازلي (يحسب الوقت المتبقي بالثواني)
+const CountdownTimer = ({ targetDate, lang }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    if (!targetDate) return;
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const target = new Date(targetDate).getTime();
+      const difference = target - now;
+
+      if (difference <= 0) {
+        setTimeLeft(lang === 'ar' ? 'انتهت الصيانة' : 'Maintenance Ended');
+        clearInterval(interval);
+      } else {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+        
+        // تنسيق الوقت ليظهر بشكل 00:00:00
+        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        setTimeLeft(lang === 'ar' ? `${days} يوم و ${formattedTime}` : `${days}d ${formattedTime}`);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [targetDate, lang]);
+
+  return <span className="text-xs font-bold text-red-500 block mt-2 bg-red-50 px-2 py-1 rounded border border-red-100" dir="ltr">{timeLeft}</span>;
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [lang, setLang] = useState('en');
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' or 'rooms'
+  const [activeTab, setActiveTab] = useState('bookings');
   
   const [allBookings, setAllBookings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // حالات إضافة غرفة جديدة
   const [newRoomId, setNewRoomId] = useState('');
   const [newRoomPrice, setNewRoomPrice] = useState('');
   const [newRoomImage, setNewRoomImage] = useState('');
@@ -54,11 +84,9 @@ const AdminDashboard = () => {
           return navigate('/');
         }
 
-        // جلب الحجوزات
         const { data: bookingsData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
         if (bookingsData) setAllBookings(bookingsData);
 
-        // جلب الغرف
         const { data: roomsData } = await supabase.from('rooms').select('*').order('room_id', { ascending: true });
         if (roomsData) setRooms(roomsData);
 
@@ -72,18 +100,11 @@ const AdminDashboard = () => {
     fetchAdminData();
   }, [navigate, lang]);
 
-  // ================= دوال الحجوزات =================
-
-  // حساب الأيام المتبقية (بافتراض أن الترم 90 يوماً من تاريخ الحجز)
+  // حساب الأيام المتبقية لانتهاء الترم
   const getRemainingDays = (createdAt) => {
-    const startDate = new Date(createdAt);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 90); // يمكنك تغيير رقم 90 إلى مدة الترم التي تناسبك
-    
-    const today = new Date();
-    const diffTime = endDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+    const endDate = new Date(createdAt);
+    endDate.setDate(endDate.getDate() + 90); 
+    const diffDays = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
   };
 
@@ -97,47 +118,47 @@ const AdminDashboard = () => {
     }
   };
 
-  // إلغاء الحجز نهائياً
+  // 1. إلغاء الحجز وإدخال الغرفة في صيانة لمدة 10 أيام
   const handleCancelBooking = async (bookingId, roomId) => {
-    const confirmMsg = lang === 'ar' ? 'هل أنت متأكد من إلغاء هذا الحجز نهائياً؟ ستعود الغرفة متاحة للطلاب.' : 'Are you sure you want to cancel this booking? The room will be available again.';
+    const confirmMsg = lang === 'ar' 
+      ? 'هل أنت متأكد من إلغاء هذا الحجز؟ ستدخل الغرفة تلقائياً في حالة الصيانة لمدة 10 أيام.' 
+      : 'Cancel this booking? The room will go into maintenance for 10 days.';
+    
     if (!window.confirm(confirmMsg)) return;
 
+    // حساب تاريخ انتهاء الصيانة بعد 10 أيام من الآن
+    const maintenanceEndDate = new Date();
+    maintenanceEndDate.setDate(maintenanceEndDate.getDate() + 10);
+
     try {
-      // 1. مسح الحجز من قاعدة البيانات
       const { error: bookingError } = await supabase.from('bookings').delete().eq('booking_id', bookingId);
       if (bookingError) throw bookingError;
 
-      // 2. إعادة حالة الغرفة إلى متاحة
-      const { error: roomError } = await supabase.from('rooms').update({ status: 'available' }).eq('room_id', roomId);
+      const { error: roomError } = await supabase.from('rooms').update({ 
+        status: 'maintenance',
+        maintenance_end: maintenanceEndDate.toISOString()
+      }).eq('room_id', roomId);
       if (roomError) throw roomError;
 
-      // 3. تحديث الواجهة
       setAllBookings(allBookings.filter(b => b.booking_id !== bookingId));
-      setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: 'available' } : r));
+      setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() } : r));
       
-      alert(lang === 'ar' ? 'تم إلغاء الحجز وتحرير الغرفة بنجاح!' : 'Booking cancelled and room freed successfully!');
+      alert(lang === 'ar' ? 'تم الإلغاء وتحويل الغرفة للصيانة!' : 'Cancelled and room moved to maintenance!');
     } catch (error) {
       console.error(error);
-      alert(lang === 'ar' ? 'حدث خطأ أثناء إلغاء الحجز.' : 'Error cancelling booking.');
+      alert(lang === 'ar' ? 'حدث خطأ أثناء الإلغاء.' : 'Error cancelling.');
     }
   };
-
-  // ================= دوال إدارة الغرف =================
 
   const handleAddRoom = async (e) => {
     e.preventDefault();
     if (!newRoomId || !newRoomPrice) return;
-
     const defaultImage = "https://images.unsplash.com/photo-1522771731478-44eb10e5c836?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80";
 
     try {
       const { error } = await supabase.from('rooms').insert([{
-        room_id: newRoomId,
-        price: Number(newRoomPrice),
-        status: 'available',
-        image_url: newRoomImage || defaultImage
+        room_id: newRoomId, price: Number(newRoomPrice), status: 'available', image_url: newRoomImage || defaultImage
       }]);
-
       if (error) throw error;
 
       setRooms([...rooms, { room_id: newRoomId, price: Number(newRoomPrice), status: 'available', image_url: newRoomImage || defaultImage }]);
@@ -149,24 +170,36 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteRoom = async (roomId) => {
-    const confirmDelete = window.confirm(lang === 'ar' ? `هل أنت متأكد من حذف الغرفة ${roomId}؟` : `Delete room ${roomId}?`);
-    if (!confirmDelete) return;
-
+    if (!window.confirm(lang === 'ar' ? `حذف الغرفة ${roomId}؟` : `Delete room ${roomId}?`)) return;
     try {
       const { error } = await supabase.from('rooms').delete().eq('room_id', roomId);
       if (error) throw error;
       setRooms(rooms.filter(r => r.room_id !== roomId));
     } catch (error) {
-      alert(lang === 'ar' ? 'لا يمكن حذف غرفة بها حجوزات مسجلة. قم بإلغاء الحجز أولاً.' : 'Cannot delete a room with existing bookings. Cancel the booking first.');
+      alert(lang === 'ar' ? 'لا يمكن حذف غرفة بها حجوزات مسجلة.' : 'Cannot delete a room with existing bookings.');
     }
   };
 
+  // 2. إدخال الغرفة للصيانة يدوياً 
   const toggleRoomStatus = async (roomId, currentStatus) => {
-    const newStatus = currentStatus === 'maintenance' ? 'available' : 'maintenance';
+    const isGoingToMaintenance = currentStatus !== 'maintenance';
+    const newStatus = isGoingToMaintenance ? 'maintenance' : 'available';
+    
+    let maintenanceEnd = null;
+    if (isGoingToMaintenance) {
+      const d = new Date();
+      d.setDate(d.getDate() + 10);
+      maintenanceEnd = d.toISOString();
+    }
+
     try {
-      const { error } = await supabase.from('rooms').update({ status: newStatus }).eq('room_id', roomId);
+      const { error } = await supabase.from('rooms').update({ 
+        status: newStatus, 
+        maintenance_end: maintenanceEnd 
+      }).eq('room_id', roomId);
       if (error) throw error;
-      setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: newStatus } : r));
+      
+      setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: newStatus, maintenance_end: maintenanceEnd } : r));
     } catch (error) {
       alert("حدث خطأ أثناء التحديث.");
     }
@@ -177,9 +210,15 @@ const AdminDashboard = () => {
     navigate('/');
   };
 
+  // منع كتابة الأرقام السالبة أو الحروف في حقل السعر
+  const handlePriceKeyDown = (e) => {
+    if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === '.') {
+      e.preventDefault();
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-gray-100 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Navbar للإدارة */}
       <nav className="bg-[#1b2a47] px-4 md:px-12 py-4 flex justify-between items-center shadow-lg" dir="ltr">
         <div className="flex items-center gap-3">
           <img src={logo} alt="Logo" className="h-10 bg-white rounded-full p-1 object-contain" />
@@ -191,13 +230,11 @@ const AdminDashboard = () => {
         </div>
       </nav>
 
-      {/* محتوى لوحة التحكم */}
       <div className="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
         <h1 className="text-3xl md:text-4xl font-extrabold text-[#1b2a47] mb-8 border-b-4 border-[#5ca393] inline-block pb-2">
           {t.title}
         </h1>
 
-        {/* أزرار التبويبات */}
         <div className="flex gap-4 mb-8 border-b border-gray-200 pb-4">
           <button onClick={() => setActiveTab('bookings')} className={`px-6 py-2 font-bold rounded-lg transition-colors ${activeTab === 'bookings' ? 'bg-[#5ca393] text-white' : 'bg-white text-gray-500 hover:bg-gray-200'}`}>
             {t.tabBookings}
@@ -210,7 +247,6 @@ const AdminDashboard = () => {
         {loading ? (
           <div className="text-center text-xl font-bold text-gray-500 mt-20">جاري التحميل...</div>
         ) : activeTab === 'bookings' ? (
-          // ================= تبويب الحجوزات =================
           allBookings.length === 0 ? (
             <div className="text-center mt-10 bg-white p-10 rounded-2xl shadow-sm border border-gray-200 text-xl font-bold text-gray-400">{t.noBookings}</div>
           ) : (
@@ -234,12 +270,9 @@ const AdminDashboard = () => {
                         <td className={`p-4 font-extrabold text-[#1b2a47] ${lang === 'ar' ? 'text-right' : ''}`}>{booking.booking_id}</td>
                         <td className={`p-4 text-[#5ca393] font-bold ${lang === 'ar' ? 'text-right' : ''}`}>{booking.student_id}</td>
                         <td className={`p-4 font-bold text-gray-700 ${lang === 'ar' ? 'text-right' : ''}`}>{booking.room_id}</td>
-                        
-                        {/* عمود المدة المتبقية */}
                         <td className={`p-4 font-bold text-orange-500 ${lang === 'ar' ? 'text-right' : ''}`}>
                           {getRemainingDays(booking.created_at)} {t.days}
                         </td>
-
                         <td className={`p-4 ${lang === 'ar' ? 'text-right' : ''}`}>
                           <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${booking.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                             {booking.payment_status}
@@ -261,7 +294,6 @@ const AdminDashboard = () => {
                               {t.markConfirmed}
                             </button>
                           )}
-                          {/* زر إلغاء الحجز */}
                           <button onClick={() => handleCancelBooking(booking.booking_id, booking.room_id)} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors">
                             {t.cancelBooking}
                           </button>
@@ -274,14 +306,22 @@ const AdminDashboard = () => {
             </div>
           )
         ) : (
-          // ================= تبويب إدارة الغرف =================
           <div className="space-y-8">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
               <h2 className="text-xl font-bold text-[#1b2a47] mb-4">{t.addRoom}</h2>
               <form onSubmit={handleAddRoom} className="flex flex-col gap-4">
                 <div className="flex flex-col md:flex-row gap-4">
                   <input type="text" required value={newRoomId} onChange={(e) => setNewRoomId(e.target.value)} placeholder={t.roomIdPlaceholder} className="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-[#5ca393] outline-none" />
-                  <input type="number" required value={newRoomPrice} onChange={(e) => setNewRoomPrice(e.target.value)} placeholder={t.pricePlaceholder} className="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-[#5ca393] outline-none" />
+                  <input 
+                    type="number" 
+                    min="0"
+                    onKeyDown={handlePriceKeyDown}
+                    required 
+                    value={newRoomPrice} 
+                    onChange={(e) => setNewRoomPrice(e.target.value)} 
+                    placeholder={t.pricePlaceholder} 
+                    className="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-[#5ca393] outline-none" 
+                  />
                 </div>
                 <div className="flex flex-col md:flex-row gap-4">
                   <input type="text" value={newRoomImage} onChange={(e) => setNewRoomImage(e.target.value)} placeholder={t.imagePlaceholder} className="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-[#5ca393] outline-none" dir="ltr" />
@@ -308,7 +348,6 @@ const AdminDashboard = () => {
                     </thead>
                     <tbody>
                       {rooms.map((room) => {
-                        // البحث عن الطالب الحاجز للغرفة (إن وجد)
                         const activeBooking = allBookings.find(b => b.room_id === room.room_id);
 
                         return (
@@ -318,7 +357,6 @@ const AdminDashboard = () => {
                             </td>
                             <td className={`p-4 font-extrabold text-[#1b2a47] ${lang === 'ar' ? 'text-right' : ''}`}>{room.room_id}</td>
                             
-                            {/* إظهار كود الطالب في جدول الغرف */}
                             <td className={`p-4 font-bold ${lang === 'ar' ? 'text-right' : ''}`}>
                               {room.status === 'booked' && activeBooking ? (
                                 <span className="bg-blue-50 text-[#5ca393] px-2 py-1 rounded-lg border border-blue-100">{activeBooking.student_id}</span>
@@ -336,6 +374,10 @@ const AdminDashboard = () => {
                                   'bg-gray-200 text-gray-700'}`}>
                                 {room.status}
                               </span>
+                              {/* ظهور العداد التنازلي إذا كانت الغرفة في وضع الصيانة */}
+                              {room.status === 'maintenance' && room.maintenance_end && (
+                                <CountdownTimer targetDate={room.maintenance_end} lang={lang} />
+                              )}
                             </td>
                             <td className="p-4 flex gap-2 justify-center items-center h-full mt-2">
                               <button onClick={() => toggleRoomStatus(room.room_id, room.status)} className={`px-3 py-1.5 text-white text-xs font-bold rounded-lg transition-colors ${room.status === 'maintenance' ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
