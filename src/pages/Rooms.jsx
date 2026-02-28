@@ -11,26 +11,25 @@ const Rooms = () => {
   const [user, setUser] = useState(null);
   const [studentData, setStudentData] = useState(null);
 
-  // حالات النافذة المنبثقة (Modal) الخاصة بتأكيد الحجز
+  // حالات النوافذ المنبثقة (Modals)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false); // 👈 حالة نافذة النجاح الجديدة
 
   const t = {
     en: {
       toggleLang: "عربي", back: "Back to Home", title: "Available Rooms",
       price: "Price per term", bookBtn: "Book Now", loginToBook: "Login to Book",
       successMsg: "Room booked successfully!", noRooms: "No available rooms at the moment.",
-      // نصوص النافذة المنبثقة
       confirmTitle: "Confirm Booking", confirmQuestion: "Are you sure you want to book room number",
-      yesBtn: "Yes, Book it", noBtn: "Cancel"
+      yesBtn: "Yes, Book it", noBtn: "Cancel", okBtn: "OK"
     },
     ar: {
       toggleLang: "English", back: "الرئيسية", title: "الغرف المتاحة",
       price: "السعر للترم", bookBtn: "احجز الآن", loginToBook: "سجل دخولك للحجز",
       successMsg: "تم حجز الغرفة بنجاح!", noRooms: "لا توجد غرف متاحة حالياً.",
-      // نصوص النافذة المنبثقة
       confirmTitle: "تأكيد الحجز", confirmQuestion: "هل أنت متأكد أنك تريد حجز الغرفة رقم",
-      yesBtn: "نعم، تأكيد الحجز", noBtn: "تراجع"
+      yesBtn: "نعم، تأكيد الحجز", noBtn: "تراجع", okBtn: "حسناً"
     }
   }[lang];
 
@@ -59,7 +58,6 @@ const Rooms = () => {
     fetchData();
   }, []);
 
-  // دالة فتح النافذة المنبثقة
   const openConfirmModal = (roomId) => {
     if (!user || !studentData) {
       alert(lang === 'ar' ? 'يجب تسجيل الدخول كطالب أولاً.' : 'You must login as a student first.');
@@ -70,16 +68,14 @@ const Rooms = () => {
     setIsModalOpen(true);
   };
 
-  // دالة إغلاق النافذة المنبثقة
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedRoomId(null);
   };
 
-  // دالة تنفيذ الحجز (تُستدعى عند الضغط على "نعم")
   const executeBooking = async () => {
     const roomId = selectedRoomId;
-    closeModal(); // إغلاق النافذة فوراً
+    closeModal(); 
 
     const bookingId = Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -105,7 +101,9 @@ const Rooms = () => {
       if (roomError) throw roomError;
 
       setRooms(rooms.filter(room => room.room_id !== roomId));
-      alert(t.successMsg);
+      
+      // 👈 إظهار نافذة النجاح الأنيقة بدلاً من رسالة المتصفح
+      setIsSuccessModalOpen(true);
 
     } catch (error) {
       console.error("Booking error:", error);
@@ -116,7 +114,7 @@ const Rooms = () => {
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col relative ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
-      {/* ================== النافذة المنبثقة (Modal) ================== */}
+      {/* ================== نافذة تأكيد الحجز (Modal) ================== */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full transform transition-all scale-100">
@@ -128,19 +126,34 @@ const Rooms = () => {
               {t.confirmQuestion} <span className="text-[#5ca393] text-xl ml-1">{selectedRoomId}</span>؟
             </p>
             <div className="flex flex-col gap-3">
-              <button 
-                onClick={executeBooking} 
-                className="w-full py-3 bg-[#1b2a47] text-white font-bold rounded-xl hover:bg-[#2a406b] transition-colors shadow-md"
-              >
+              <button onClick={executeBooking} className="w-full py-3 bg-[#1b2a47] text-white font-bold rounded-xl hover:bg-[#2a406b] transition-colors shadow-md">
                 {t.yesBtn}
               </button>
-              <button 
-                onClick={closeModal} 
-                className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
-              >
+              <button onClick={closeModal} className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors">
                 {t.noBtn}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================== نافذة النجاح (Success Modal) ================== */}
+      {isSuccessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full transform transition-all scale-100 text-center">
+            <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">
+              ✅
+            </div>
+            <h3 className="text-2xl font-bold text-[#1b2a47] mb-2">{t.successMsg}</h3>
+            <p className="text-gray-500 font-medium mb-8">
+              {lang === 'ar' ? 'يمكنك متابعة تفاصيل حجزك من صفحة حجوزاتي.' : 'You can track your booking details from My Bookings page.'}
+            </p>
+            <button 
+              onClick={() => setIsSuccessModalOpen(false)} 
+              className="w-full py-3 bg-[#5ca393] text-white font-bold rounded-xl hover:bg-[#458b7c] transition-colors shadow-md"
+            >
+              {t.okBtn}
+            </button>
           </div>
         </div>
       )}
@@ -189,17 +202,11 @@ const Rooms = () => {
                   </div>
                   
                   {user ? (
-                    <button 
-                      onClick={() => openConfirmModal(room.room_id)} // 👈 استدعاء النافذة المنبثقة بدلاً من رسالة المتصفح
-                      className="w-full py-3 bg-gradient-to-r from-[#1b2a47] to-[#2a406b] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-md"
-                    >
+                    <button onClick={() => openConfirmModal(room.room_id)} className="w-full py-3 bg-gradient-to-r from-[#1b2a47] to-[#2a406b] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-md">
                       {t.bookBtn}
                     </button>
                   ) : (
-                    <button 
-                      onClick={() => navigate('/login')}
-                      className="w-full py-3 bg-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-300 transition-colors"
-                    >
+                    <button onClick={() => navigate('/login')} className="w-full py-3 bg-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-300 transition-colors">
                       {t.loginToBook}
                     </button>
                   )}
