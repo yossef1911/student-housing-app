@@ -1,0 +1,17 @@
+
+/* 1. استدعاء Tailwind ثانياً */
+@import "tailwindcss";
+
+/* 2. إعدادات الألوان والخطوط */
+@theme {
+  --color-unihome-dark: #1E3A5F;
+  --color-unihome-blue: #2B90B6;
+  --color-unihome-green: #419D78;
+  
+  --font-sans: 'Cairo', sans-serif;
+  --font-en: 'Nunito', sans-serif;
+}
+
+body {
+  font-family: 'Cairo', sans-serif;
+}
