@@ -20,7 +20,7 @@ const Signup = () => {
       login: "Login", toggleLang: "عربي",
       joinTitle: "Join the UniHome Community",
       namePlaceholder: "Name",
-      idPlaceholder: "Student ID (Numbers only)",
+      idPlaceholder: "Student ID (Min 6 digits)", // 👈 تعديل النص هنا
       emailPlaceholder: "Email",
       passPlaceholder: "Password",
       confirmPassPlaceholder: "Confirm Password",
@@ -29,6 +29,7 @@ const Signup = () => {
       loginHere: "Login here",
       gmailError: "Email must end with @gmail.com only.",
       matchError: "Passwords do not match.",
+      idLengthError: "Student ID must be at least 6 digits.", // 👈 رسالة خطأ جديدة
       dbError: "Error saving data. The Student ID might already be registered.",
       successMsg: "Account created successfully!"
     },
@@ -36,7 +37,7 @@ const Signup = () => {
       login: "دخول", toggleLang: "English",
       joinTitle: "انضم إلى مجتمع UniHome",
       namePlaceholder: "الاسم باللغة الإنجليزية", 
-      idPlaceholder: "الرقم الجامعي (أرقام فقط)",
+      idPlaceholder: "الرقم الجامعي (6 أرقام على الأقل)", // 👈 تعديل النص هنا
       emailPlaceholder: "البريد الإلكتروني",
       passPlaceholder: "كلمة المرور",
       confirmPassPlaceholder: "تأكيد كلمة المرور",
@@ -45,6 +46,7 @@ const Signup = () => {
       loginHere: "سجل دخولك هنا",
       gmailError: "يجب أن ينتهي البريد الإلكتروني بـ @gmail.com فقط.",
       matchError: "كلمتا المرور غير متطابقتين.",
+      idLengthError: "يجب أن يتكون الرقم الجامعي من 6 أرقام على الأقل.", // 👈 رسالة خطأ جديدة
       dbError: "حدث خطأ أثناء الحفظ. قد يكون الرقم الجامعي مسجلاً بالفعل.",
       successMsg: "تم إنشاء الحساب بنجاح!"
     }
@@ -82,8 +84,9 @@ const Signup = () => {
       setErrorMsg(t.matchError);
       return;
     }
-    if (!studentId) {
-      setErrorMsg(lang === 'ar' ? 'الرقم الجامعي مطلوب.' : 'Student ID is required.');
+    // 👈 التعديل هنا: فحص طول الرقم الجامعي ليكون 6 أرقام على الأقل
+    if (!studentId || studentId.length < 6) {
+      setErrorMsg(t.idLengthError);
       return;
     }
 
