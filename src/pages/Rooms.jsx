@@ -14,7 +14,8 @@ const Rooms = () => {
   // حالات النوافذ المنبثقة (Modals)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false); // 👈 حالة نافذة النجاح الجديدة
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isLoginWarningModalOpen, setIsLoginWarningModalOpen] = useState(false); // 👈 حالة نافذة التنبيه الجديدة
 
   const t = {
     en: {
@@ -22,14 +23,20 @@ const Rooms = () => {
       price: "Price per term", bookBtn: "Book Now", loginToBook: "Login to Book",
       successMsg: "Room booked successfully!", noRooms: "No available rooms at the moment.",
       confirmTitle: "Confirm Booking", confirmQuestion: "Are you sure you want to book room number",
-      yesBtn: "Yes, Book it", noBtn: "Cancel", okBtn: "OK"
+      yesBtn: "Yes, Book it", noBtn: "Cancel", okBtn: "OK",
+      // نصوص نافذة التنبيه
+      warningTitle: "Login Required", warningMsg: "You must login as a student first to book a room.",
+      loginBtn: "Go to Login", cancelBtn: "Close"
     },
     ar: {
       toggleLang: "English", back: "الرئيسية", title: "الغرف المتاحة",
       price: "السعر للترم", bookBtn: "احجز الآن", loginToBook: "سجل دخولك للحجز",
       successMsg: "تم حجز الغرفة بنجاح!", noRooms: "لا توجد غرف متاحة حالياً.",
       confirmTitle: "تأكيد الحجز", confirmQuestion: "هل أنت متأكد أنك تريد حجز الغرفة رقم",
-      yesBtn: "نعم، تأكيد الحجز", noBtn: "تراجع", okBtn: "حسناً"
+      yesBtn: "نعم، تأكيد الحجز", noBtn: "تراجع", okBtn: "حسناً",
+      // نصوص نافذة التنبيه
+      warningTitle: "تنبيه تسجيل الدخول", warningMsg: "يجب عليك تسجيل الدخول كطالب أولاً لتتمكن من الحجز.",
+      loginBtn: "تسجيل الدخول", cancelBtn: "إغلاق"
     }
   }[lang];
 
@@ -58,10 +65,11 @@ const Rooms = () => {
     fetchData();
   }, []);
 
-  const openConfirmModal = (roomId) => {
+  // تعديل دالة فتح نافذة التأكيد أو التنبيه
+  const handleBookingClick = (roomId) => {
     if (!user || !studentData) {
-      alert(lang === 'ar' ? 'يجب تسجيل الدخول كطالب أولاً.' : 'You must login as a student first.');
-      navigate('/login');
+      // 👈 إظهار نافذة التنبيه الأنيقة بدلاً من رسالة المتصفح
+      setIsLoginWarningModalOpen(true);
       return;
     }
     setSelectedRoomId(roomId);
@@ -101,8 +109,6 @@ const Rooms = () => {
       if (roomError) throw roomError;
 
       setRooms(rooms.filter(room => room.room_id !== roomId));
-      
-      // 👈 إظهار نافذة النجاح الأنيقة بدلاً من رسالة المتصفح
       setIsSuccessModalOpen(true);
 
     } catch (error) {
@@ -114,6 +120,36 @@ const Rooms = () => {
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col relative ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
+      {/* ================== نافذة التنبيه (Login Warning Modal) ================== */}
+      {isLoginWarningModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full transform transition-all scale-100 text-center">
+            <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">
+              ⚠️
+            </div>
+            <h3 className="text-2xl font-bold text-[#1b2a47] mb-2">{t.warningTitle}</h3>
+            <p className="text-gray-500 font-medium mb-8">
+              {t.warningMsg}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => navigate('/login')} 
+                className="w-full py-3 bg-gradient-to-r from-[#1b2a47] to-[#2a406b] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-md"
+              >
+                {t.loginBtn}
+              </button>
+              <button 
+                onClick={() => setIsLoginWarningModalOpen(false)} 
+                className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                {t.cancelBtn}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+
       {/* ================== نافذة تأكيد الحجز (Modal) ================== */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
@@ -201,15 +237,14 @@ const Rooms = () => {
                     {room.price} <span className="text-sm text-gray-400">EGP</span>
                   </div>
                   
-                  {user ? (
-                    <button onClick={() => openConfirmModal(room.room_id)} className="w-full py-3 bg-gradient-to-r from-[#1b2a47] to-[#2a406b] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-md">
-                      {t.bookBtn}
-                    </button>
-                  ) : (
-                    <button onClick={() => navigate('/login')} className="w-full py-3 bg-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-300 transition-colors">
-                      {t.loginToBook}
-                    </button>
-                  )}
+                  {/* زر الحجز الموحد الذي يعالج الدخول أو التأكيد */}
+                  <button 
+                    onClick={() => handleBookingClick(room.room_id)} 
+                    className={`w-full py-3 font-bold rounded-xl transition-transform shadow-md hover:scale-105 ${user ? 'bg-gradient-to-r from-[#1b2a47] to-[#2a406b] text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                  >
+                    {user ? t.bookBtn : t.loginToBook}
+                  </button>
+
                 </div>
 
               </div>
