@@ -11,27 +11,34 @@ const Rooms = () => {
   const [user, setUser] = useState(null);
   const [studentData, setStudentData] = useState(null);
 
+  // حالات النافذة المنبثقة (Modal) الخاصة بتأكيد الحجز
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
+
   const t = {
     en: {
       toggleLang: "عربي", back: "Back to Home", title: "Available Rooms",
       price: "Price per term", bookBtn: "Book Now", loginToBook: "Login to Book",
       successMsg: "Room booked successfully!", noRooms: "No available rooms at the moment.",
+      // نصوص النافذة المنبثقة
+      confirmTitle: "Confirm Booking", confirmQuestion: "Are you sure you want to book room number",
+      yesBtn: "Yes, Book it", noBtn: "Cancel"
     },
     ar: {
       toggleLang: "English", back: "الرئيسية", title: "الغرف المتاحة",
       price: "السعر للترم", bookBtn: "احجز الآن", loginToBook: "سجل دخولك للحجز",
       successMsg: "تم حجز الغرفة بنجاح!", noRooms: "لا توجد غرف متاحة حالياً.",
+      // نصوص النافذة المنبثقة
+      confirmTitle: "تأكيد الحجز", confirmQuestion: "هل أنت متأكد أنك تريد حجز الغرفة رقم",
+      yesBtn: "نعم، تأكيد الحجز", noBtn: "تراجع"
     }
   }[lang];
 
-  // جلب الغرف المتاحة وبيانات الطالب عند فتح الصفحة
   useEffect(() => {
     const fetchData = async () => {
-      // 1. جلب المستخدم الحالي
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setUser(session.user);
-        // جلب الـ student_id الخاص به من قاعدة البيانات
         const { data: student } = await supabase
           .from('students')
           .select('student_id')
@@ -40,7 +47,6 @@ const Rooms = () => {
         if (student) setStudentData(student);
       }
 
-      // 2. جلب الغرف المتاحة فقط
       const { data: availableRooms } = await supabase
         .from('rooms')
         .select('*')
@@ -53,36 +59,44 @@ const Rooms = () => {
     fetchData();
   }, []);
 
-  // دالة الحجز
-  const handleBookRoom = async (roomId) => {
+  // دالة فتح النافذة المنبثقة
+  const openConfirmModal = (roomId) => {
     if (!user || !studentData) {
       alert(lang === 'ar' ? 'يجب تسجيل الدخول كطالب أولاً.' : 'You must login as a student first.');
       navigate('/login');
       return;
     }
+    setSelectedRoomId(roomId);
+    setIsModalOpen(true);
+  };
 
-    const confirmBooking = window.confirm(lang === 'ar' ? `تأكيد حجز الغرفة ${roomId}؟` : `Confirm booking for room ${roomId}?`);
-    if (!confirmBooking) return;
+  // دالة إغلاق النافذة المنبثقة
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedRoomId(null);
+  };
 
-    // توليد ID عشوائي للحجز مكون من 6 حروف/أرقام بالضبط لتجاوز مشكلة الـ 6 حروف
+  // دالة تنفيذ الحجز (تُستدعى عند الضغط على "نعم")
+  const executeBooking = async () => {
+    const roomId = selectedRoomId;
+    closeModal(); // إغلاق النافذة فوراً
+
     const bookingId = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     try {
-      // 1. إضافة الحجز في جدول bookings
       const { error: bookingError } = await supabase
         .from('bookings')
         .insert([{
-          booking_id: bookingId,           // 6 حروف بالضبط
+          booking_id: bookingId,
           student_id: studentData.student_id, 
           room_id: roomId,
           academic_year: 'Term 1',         
-          payment_status: 'unpaid',        // الكلمة التي تقبلها قاعدة بياناتك
-          booking_status: 'pending'        // الكلمة التي تقبلها قاعدة بياناتك
+          payment_status: 'unpaid',
+          booking_status: 'pending'
         }]);
 
       if (bookingError) throw bookingError;
 
-      // 2. تحديث حالة الغرفة لتصبح محجوزة
       const { error: roomError } = await supabase
         .from('rooms')
         .update({ status: 'booked' })
@@ -90,7 +104,6 @@ const Rooms = () => {
 
       if (roomError) throw roomError;
 
-      // 3. تحديث الواجهة لإخفاء الغرفة التي تم حجزها
       setRooms(rooms.filter(room => room.room_id !== roomId));
       alert(t.successMsg);
 
@@ -101,8 +114,38 @@ const Rooms = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-gray-50 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Navbar بسيط */}
+    <div className={`min-h-screen bg-gray-50 flex flex-col relative ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      
+      {/* ================== النافذة المنبثقة (Modal) ================== */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full transform transition-all scale-100">
+            <div className="w-16 h-16 bg-blue-50 text-[#5ca393] rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              🏠
+            </div>
+            <h3 className="text-2xl font-bold text-[#1b2a47] text-center mb-2">{t.confirmTitle}</h3>
+            <p className="text-gray-500 text-center font-bold mb-8">
+              {t.confirmQuestion} <span className="text-[#5ca393] text-xl ml-1">{selectedRoomId}</span>؟
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={executeBooking} 
+                className="w-full py-3 bg-[#1b2a47] text-white font-bold rounded-xl hover:bg-[#2a406b] transition-colors shadow-md"
+              >
+                {t.yesBtn}
+              </button>
+              <button 
+                onClick={closeModal} 
+                className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                {t.noBtn}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================== */}
+
       <nav className="bg-white px-4 md:px-12 py-4 flex justify-between items-center shadow-sm" dir="ltr">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <img src={logo} alt="Logo" className="h-12 object-contain" />
@@ -114,7 +157,6 @@ const Rooms = () => {
         </div>
       </nav>
 
-      {/* محتوى الصفحة */}
       <div className="flex-grow max-w-6xl mx-auto px-4 py-12 w-full">
         <h1 className="text-3xl md:text-4xl font-extrabold text-[#1b2a47] mb-10 text-center border-b-4 border-[#5ca393] inline-block pb-2">
           {t.title}
@@ -129,30 +171,26 @@ const Rooms = () => {
             {rooms.map((room) => (
               <div key={room.room_id} className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow border border-gray-100 flex flex-col overflow-hidden text-center group">
                 
-                {/* 1. قسم الصورة العلوي */}
                 <div className="w-full h-52 relative overflow-hidden bg-gray-200">
                   <img 
                     src={room.image_url || "https://images.unsplash.com/photo-1522771731478-44eb10e5c836?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"} 
                     alt={`Room ${room.room_id}`} 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
                   />
-                  {/* رقم الغرفة يطفو فوق الصورة */}
                   <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-[#1b2a47] px-4 py-1 border-2 border-[#1b2a47] font-black text-xl rounded-full shadow-lg">
                     {room.room_id}
                   </div>
                 </div>
 
-                {/* 2. قسم البيانات والسعر */}
                 <div className="p-6 flex flex-col items-center">
                   <div className="text-gray-500 font-bold mb-1">{t.price}</div>
                   <div className="text-3xl font-extrabold text-[#5ca393] mb-6">
                     {room.price} <span className="text-sm text-gray-400">EGP</span>
                   </div>
                   
-                  {/* 3. زر الحجز */}
                   {user ? (
                     <button 
-                      onClick={() => handleBookRoom(room.room_id)}
+                      onClick={() => openConfirmModal(room.room_id)} // 👈 استدعاء النافذة المنبثقة بدلاً من رسالة المتصفح
                       className="w-full py-3 bg-gradient-to-r from-[#1b2a47] to-[#2a406b] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-md"
                     >
                       {t.bookBtn}
