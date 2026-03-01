@@ -70,15 +70,15 @@ const Home = () => {
     <div className={`min-h-screen relative flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
       {/* Navbar الشريط العلوي */}
-      <nav className="fixed top-0 left-0 w-full bg-white px-4 md:px-12 py-3 flex justify-between items-center z-50 shadow-sm" dir="ltr">
-        <div className="flex items-center gap-2 md:gap-3 cursor-pointer shrink-0" onClick={() => navigate('/')}>
+      <nav className="fixed top-0 left-0 w-full bg-white px-2 md:px-12 py-3 flex justify-between items-center z-50 shadow-sm" dir="ltr">
+        <div className="flex items-center gap-1 md:gap-3 cursor-pointer shrink-0" onClick={() => navigate('/')}>
           <img src={logo} alt="UniHome Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 object-contain" />
           <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1b2a47] font-en tracking-tight">
             UniHome
           </span>
         </div>
 
-        <div className="flex items-center gap-4 md:gap-6 shrink-0">
+        <div className="flex items-center gap-2 md:gap-6 shrink-0">
           <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="text-sm md:text-base text-gray-500 hover:text-[#1b2a47] font-bold transition-colors">
             {t.toggleLang}
           </button>
@@ -86,24 +86,27 @@ const Home = () => {
           {/* التحقق: ماذا نعرض في الشريط العلوي؟ */}
           {user ? (
             // إذا كان المستخدم مسجل الدخول
-            <div className="flex items-center gap-4">
-              <button onClick={() => navigate('/profile')} className="hidden md:inline-block text-[#1b2a47] font-bold hover:scale-105 transition-transform cursor-pointer">
+            <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end">
+              {/* تم إزالة كلاس hidden ليظهر في الجوال، مع تصغير الخط قليلاً */}
+              <button onClick={() => navigate('/profile')} className="inline-block text-xs md:text-base text-[#1b2a47] font-bold hover:scale-105 transition-transform cursor-pointer">
                 {t.welcomeNav}, <span className="text-[#5ca393] underline decoration-2 underline-offset-4">{userName}</span>
               </button>
-              <button onClick={() => navigate('/my-bookings')} className="text-sm md:text-base text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
+              
+              <button onClick={() => navigate('/my-bookings')} className="text-xs md:text-base text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
                 {t.myBookings}
               </button>
-              <button onClick={handleLogout} className="px-4 py-2 text-sm md:text-base border-2 border-red-500 text-red-500 font-bold rounded-full hover:bg-red-500 hover:text-white transition-all">
+              
+              <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-base border-2 border-red-500 text-red-500 font-bold rounded-full hover:bg-red-500 hover:text-white transition-all">
                 {t.logout}
               </button>
             </div>
           ) : (
             // إذا كان المستخدم غير مسجل الدخول (زائر)
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <Link to="/login" className="text-sm md:text-base text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
                 {t.login}
               </Link>
-              <Link to="/signup" className="px-5 py-2 md:px-8 md:py-2.5 text-sm md:text-base bg-gradient-to-r from-[#5ca393] to-[#458b7c] text-white font-bold rounded-full hover:shadow-lg transition-all">
+              <Link to="/signup" className="px-4 py-1.5 md:px-8 md:py-2.5 text-sm md:text-base bg-gradient-to-r from-[#5ca393] to-[#458b7c] text-white font-bold rounded-full hover:shadow-lg transition-all">
                 {t.signup}
               </Link>
             </div>
@@ -126,7 +129,7 @@ const Home = () => {
             {t.heroSubtitle}
           </p>
           <button onClick={() => navigate('/rooms')} className="px-8 py-4 text-lg bg-gradient-to-r from-[#5ca393] to-[#458b7c] text-white font-bold rounded-full hover:scale-105 hover:shadow-xl transition-all transform duration-300">
-  {t.browseBtn}
+            {t.browseBtn}
           </button>
         </div>
       </div>
