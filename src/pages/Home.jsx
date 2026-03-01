@@ -7,8 +7,8 @@ const Home = () => {
   const navigate = useNavigate();
   const [lang, setLang] = useState('en');
   const [user, setUser] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // 👈 حالة القائمة المنسدلة للجوال
 
-  // التحقق من حالة تسجيل الدخول عند فتح الصفحة
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -19,7 +19,6 @@ const Home = () => {
     
     checkUser();
 
-    // الاستماع لأي تغيير في حالة الدخول/الخروج
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
     });
@@ -29,9 +28,9 @@ const Home = () => {
     };
   }, []);
 
-  // دالة تسجيل الخروج
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setIsMenuOpen(false); // إغلاق القائمة عند تسجيل الخروج
     navigate('/');
   };
 
@@ -61,57 +60,97 @@ const Home = () => {
   };
 
   const t = content[lang];
-  const heroImage = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80";
-
-  // استخراج اسم المستخدم من البيانات التي حفظناها وقت التسجيل
   const userName = user?.user_metadata?.full_name || '';
 
   return (
     <div className={`min-h-screen relative flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
       {/* Navbar الشريط العلوي */}
-      <nav className="fixed top-0 left-0 w-full bg-white px-2 md:px-12 py-3 flex justify-between items-center z-50 shadow-sm" dir="ltr">
-        <div className="flex items-center gap-1 md:gap-3 cursor-pointer shrink-0" onClick={() => navigate('/')}>
-          <img src={logo} alt="UniHome Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 object-contain" />
-          <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1b2a47] font-en tracking-tight">
-            UniHome
-          </span>
+      <nav className="fixed top-0 left-0 w-full bg-white px-4 md:px-12 py-3 z-50 shadow-sm" dir="ltr">
+        <div className="flex justify-between items-center relative">
+          
+          {/* الشعار */}
+          <div className="flex items-center gap-2 md:gap-3 cursor-pointer shrink-0" onClick={() => navigate('/')}>
+            <img src={logo} alt="UniHome Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 object-contain" />
+            <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1b2a47] font-en tracking-tight">
+              UniHome
+            </span>
+          </div>
+
+          {/* ================== القائمة الخاصة بالشاشات الكبيرة (Desktop) ================== */}
+          <div className="hidden md:flex items-center gap-6 shrink-0">
+            <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="text-base text-gray-500 hover:text-[#1b2a47] font-bold transition-colors">
+              {t.toggleLang}
+            </button>
+
+            {user ? (
+              <div className="flex items-center gap-4">
+                <button onClick={() => navigate('/profile')} className="text-[#1b2a47] font-bold hover:scale-105 transition-transform cursor-pointer">
+                  {t.welcomeNav}, <span className="text-[#5ca393] underline decoration-2 underline-offset-4">{userName}</span>
+                </button>
+                <button onClick={() => navigate('/my-bookings')} className="text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
+                  {t.myBookings}
+                </button>
+                <button onClick={handleLogout} className="px-5 py-2 border-2 border-red-500 text-red-500 font-bold rounded-full hover:bg-red-500 hover:text-white transition-all">
+                  {t.logout}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link to="/login" className="text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
+                  {t.login}
+                </Link>
+                <Link to="/signup" className="px-8 py-2.5 bg-gradient-to-r from-[#5ca393] to-[#458b7c] text-white font-bold rounded-full hover:shadow-lg transition-all">
+                  {t.signup}
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* ================== القائمة الخاصة بشاشات الجوال (Mobile) ================== */}
+          <div className="md:hidden flex items-center gap-4">
+            <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="text-sm text-gray-500 hover:text-[#1b2a47] font-bold transition-colors">
+              {t.toggleLang}
+            </button>
+            
+            {/* زر فتح/إغلاق القائمة (Hamburger Icon) */}
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-[#1b2a47] focus:outline-none p-1">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}></path>
+              </svg>
+            </button>
+          </div>
+
         </div>
 
-        <div className="flex items-center gap-2 md:gap-6 shrink-0">
-          <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="text-sm md:text-base text-gray-500 hover:text-[#1b2a47] font-bold transition-colors">
-            {t.toggleLang}
-          </button>
-
-          {/* التحقق: ماذا نعرض في الشريط العلوي؟ */}
-          {user ? (
-            // إذا كان المستخدم مسجل الدخول
-            <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end">
-              {/* تم إزالة كلاس hidden ليظهر في الجوال، مع تصغير الخط قليلاً */}
-              <button onClick={() => navigate('/profile')} className="inline-block text-xs md:text-base text-[#1b2a47] font-bold hover:scale-105 transition-transform cursor-pointer">
-                {t.welcomeNav}, <span className="text-[#5ca393] underline decoration-2 underline-offset-4">{userName}</span>
-              </button>
-              
-              <button onClick={() => navigate('/my-bookings')} className="text-xs md:text-base text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
-                {t.myBookings}
-              </button>
-              
-              <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-base border-2 border-red-500 text-red-500 font-bold rounded-full hover:bg-red-500 hover:text-white transition-all">
-                {t.logout}
-              </button>
-            </div>
-          ) : (
-            // إذا كان المستخدم غير مسجل الدخول (زائر)
-            <div className="flex items-center gap-2 md:gap-3">
-              <Link to="/login" className="text-sm md:text-base text-[#1b2a47] font-bold hover:text-[#5ca393] transition-colors">
-                {t.login}
-              </Link>
-              <Link to="/signup" className="px-4 py-1.5 md:px-8 md:py-2.5 text-sm md:text-base bg-gradient-to-r from-[#5ca393] to-[#458b7c] text-white font-bold rounded-full hover:shadow-lg transition-all">
-                {t.signup}
-              </Link>
-            </div>
-          )}
-        </div>
+        {/* نافذة القائمة المنسدلة في الجوال */}
+        {isMenuOpen && (
+          <div className="md:hidden absolute top-full left-0 w-full bg-white border-t border-gray-100 shadow-xl flex flex-col p-5 gap-4 z-50 transition-all">
+            {user ? (
+              <>
+                <div className="pb-3 border-b border-gray-100 text-center">
+                  <span className="text-gray-500 block mb-1">{t.welcomeNav}</span>
+                  <span className="text-lg font-extrabold text-[#5ca393]">{userName}</span>
+                </div>
+                <button onClick={() => { setIsMenuOpen(false); navigate('/my-bookings'); }} className="py-2 text-[#1b2a47] font-bold text-center hover:bg-gray-50 rounded-lg">
+                  {t.myBookings}
+                </button>
+                <button onClick={handleLogout} className="mt-2 py-3 border-2 border-red-500 text-red-500 font-bold rounded-xl hover:bg-red-50 transition-colors w-full">
+                  {t.logout}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" onClick={() => setIsMenuOpen(false)} className="py-3 text-[#1b2a47] font-bold text-center border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                  {t.login}
+                </Link>
+                <Link to="/signup" onClick={() => setIsMenuOpen(false)} className="py-3 bg-gradient-to-r from-[#5ca393] to-[#458b7c] text-white font-bold text-center rounded-xl shadow-md">
+                  {t.signup}
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Hero Section قسم الواجهة الرئيسية */}
