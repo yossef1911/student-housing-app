@@ -36,47 +36,53 @@ const CountdownTimer = ({ targetDate, lang }) => {
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [lang, setLang] = useState('en');
-  // تبويبات جديدة: bookings, rooms, students
   const [activeTab, setActiveTab] = useState('bookings'); 
   
   const [allBookings, setAllBookings] = useState([]);
   const [rooms, setRooms] = useState([]);
-  const [students, setStudents] = useState([]); // حالة للطلاب
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [totalRevenue, setTotalRevenue] = useState(0); // حالة للإيرادات
+  const [totalRevenue, setTotalRevenue] = useState(0);
 
   const [newRoomId, setNewRoomId] = useState('');
   const [newRoomPrice, setNewRoomPrice] = useState('');
   const [newRoomImage, setNewRoomImage] = useState('');
 
+  // حالة لتتبع الطالب الذي نريد عرض حجوزاته
+  const [expandedStudentId, setExpandedStudentId] = useState(null);
+
   const t = {
     en: {
       toggleLang: "عربي", logout: "Logout", title: "Admin Dashboard",
-      tabBookings: "Bookings", tabRooms: "Rooms", tabStudents: "Students", // ترجمة الطلاب
+      tabBookings: "Bookings", tabRooms: "Rooms", tabStudents: "Students",
       bookingId: "Booking ID", studentId: "Student ID", room: "Room", price: "Price",
       paymentStatus: "Payment", bookingStatus: "Status", actions: "Actions",
       noBookings: "No bookings.", noRooms: "No rooms.", noStudents: "No students registered.",
       markPaid: "Mark Paid", markConfirmed: "Confirm", cancelBooking: "Cancel",
-      paidSuccess: "✅ Paid", // نص بعد الدفع
+      paidSuccess: "✅ Paid",
       timeLeft: "Time Left", days: "Days", occupant: "Occupant ID",
-      studentName: "Student Name", email: "Email", roomsBooked: "Rooms Booked", // عناوين جدول الطلاب
-      totalRevenue: "Total Revenue (Paid)", currency: "EGP", // الإيرادات
+      studentName: "Student Name", email: "Email", roomsBooked: "Rooms Booked",
+      totalRevenue: "Total Revenue (Paid)", currency: "EGP",
       addRoom: "Add Room", roomIdPlaceholder: "ID (e.g. 104)", pricePlaceholder: "Price (e.g. 1500)", imagePlaceholder: "Image URL",
-      btnAdd: "Add", btnDelete: "Delete", btnMaintenance: "Maintenance", btnAvailable: "Make Available"
+      btnAdd: "Add", btnDelete: "Delete", btnMaintenance: "Maintenance", btnAvailable: "Make Available",
+      btnEditImage: "Edit Image", viewBookings: "View Bookings", hideBookings: "Hide Bookings",
+      promptImage: "Enter the new image URL:", successUpdate: "Updated successfully!"
     },
     ar: {
       toggleLang: "English", logout: "خروج", title: "لوحة تحكم الإدارة",
-      tabBookings: "الحجوزات", tabRooms: " الغرف", tabStudents: "الطلاب", // ترجمة الطلاب
+      tabBookings: "الحجوزات", tabRooms: " الغرف", tabStudents: "الطلاب",
       bookingId: "رقم الحجز", studentId: "كود الطالب", room: "غرفة", price: "السعر",
       paymentStatus: "حالة الدفع", bookingStatus: "الحجز", actions: "إجراءات",
       noBookings: "لا حجوزات.", noRooms: "لا غرف.", noStudents: "لا يوجد طلاب مسجلين.",
       markPaid: "تأكيد الدفع 🟢", markConfirmed: "تأكيد الحجز", cancelBooking: "إلغاء",
-      paidSuccess: "✅ تم الدفع", // نص بعد الدفع
+      paidSuccess: "✅ تم الدفع",
       timeLeft: "المتبقي الترم", days: "أيام", occupant: "كود الطالب",
-      studentName: "اسم الطالب", email: "الإيميل", roomsBooked: "الغرف المحجوزة", // عناوين جدول الطلاب
-      totalRevenue: "إجمالي الإيرادات (المحصلة)", currency: "جنية", // الإيرادات
+      studentName: "اسم الطالب", email: "الإيميل", roomsBooked: "الغرف المحجوزة",
+      totalRevenue: "إجمالي الإيرادات (المحصلة)", currency: "جنية",
       addRoom: "إضافة غرفة", roomIdPlaceholder: "مثال 104", pricePlaceholder: "السعر مثال 1500", imagePlaceholder: "رابط الصورة",
-      btnAdd: "إضافة", btnDelete: "حذف", btnMaintenance: "صيانة", btnAvailable: "إتاحة للطلاب"
+      btnAdd: "إضافة", btnDelete: "حذف", btnMaintenance: "صيانة", btnAvailable: "إتاحة للطلاب",
+      btnEditImage: "تعديل الصورة", viewBookings: "عرض الحجوزات", hideBookings: "إخفاء الحجوزات",
+      promptImage: "أدخل رابط الصورة الجديد:", successUpdate: "تم التحديث بنجاح!"
     }
   }[lang];
 
@@ -92,23 +98,18 @@ const AdminDashboard = () => {
           return navigate('/');
         }
 
-        // جلب الحجوزات
         const { data: bookingsData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+        let tempRevenue = 0;
+        
+        const { data: roomsData } = await supabase.from('rooms').select('*').order('room_id', { ascending: true });
+        if (roomsData) setRooms(roomsData);
+
         if (bookingsData) {
           setAllBookings(bookingsData);
-          // 3. حساب إجمالي الإيرادات المحصلة (Total Revenue)
-          const revenue = bookingsData
-            .filter(b => b.payment_status === 'paid')
-            .reduce((sum, b) => sum + (b.room_id ? 1000 : 0), 0); // بافتراض السعر 1000 لكل غرفة مؤقتاً لحين ربط السعر، سأعدلها لتقرأ من السعر الحقيقي
-            // التعديل لقراءة السعر الحقيقي يتطلب عمل Join، سأقوم به في الخطوة القادمة، الآن سأستخدم مجموع أسعار الغرف المحجوزة
-          
-          // حل مؤقت لحساب الإيرادات بدون Joint:
-          let tempRevenue = 0;
-          const { data: roomsForRevenue } = await supabase.from('rooms').select('room_id, price');
-          if(roomsForRevenue) {
+          if(roomsData) {
               bookingsData.forEach(b => {
                   if(b.payment_status === 'paid') {
-                      const roomPrice = roomsForRevenue.find(r => r.room_id === b.room_id)?.price || 0;
+                      const roomPrice = roomsData.find(r => r.room_id === b.room_id)?.price || 0;
                       tempRevenue += roomPrice;
                   }
               });
@@ -116,11 +117,6 @@ const AdminDashboard = () => {
           setTotalRevenue(tempRevenue);
         }
 
-        // جلب الغرف
-        const { data: roomsData } = await supabase.from('rooms').select('*').order('room_id', { ascending: true });
-        if (roomsData) setRooms(roomsData);
-
-        // 2. جلب بيانات الطلاب (الجدول الجديد)
         const { data: studentsData } = await supabase.from('students').select('student_id, student_name, email');
         if (studentsData) setStudents(studentsData);
 
@@ -134,9 +130,8 @@ const AdminDashboard = () => {
     fetchAdminData();
   }, [navigate, lang]);
 
-  // دالة لحساب عدد حجوزات كل طالب
-  const getStudentBookingCount = (studentId) => {
-    return allBookings.filter(b => b.student_id === studentId).length;
+  const getStudentBookingsList = (studentId) => {
+    return allBookings.filter(b => b.student_id === studentId);
   };
 
   const getRemainingDays = (createdAt) => {
@@ -146,14 +141,12 @@ const AdminDashboard = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
-  // 1. تعديل حالة الدفع (مع إخفاء الزر بعد الدفع)
   const updateBookingStatus = async (bookingId, fieldToUpdate, newValue) => {
     try {
       const { error } = await supabase.from('bookings').update({ [fieldToUpdate]: newValue }).eq('booking_id', bookingId);
       if (error) throw error;
       setAllBookings(allBookings.map(b => b.booking_id === bookingId ? { ...b, [fieldToUpdate]: newValue } : b));
       
-      // تحديث الإيرادات لحظياً بعد الدفع
       if(fieldToUpdate === 'payment_status' && newValue === 'paid') {
           const booking = allBookings.find(b => b.booking_id === bookingId);
           const roomPrice = rooms.find(r => r.room_id === booking.room_id)?.price || 0;
@@ -172,7 +165,6 @@ const AdminDashboard = () => {
     maintenanceEndDate.setDate(maintenanceEndDate.getDate() + 10);
 
     try {
-      // إذا كان الحجز ملغياً وهو مدفوع، نطرح سعره من الإيرادات
       const booking = allBookings.find(b => b.booking_id === bookingId);
       if(booking.payment_status === 'paid') {
           const roomPrice = rooms.find(r => r.room_id === roomId)?.price || 0;
@@ -208,6 +200,21 @@ const AdminDashboard = () => {
       alert(lang === 'ar' ? 'تمت الإضافة!' : 'Added!');
     } catch (error) {
       alert(lang === 'ar' ? 'رقم الغرفة مكرر.' : 'Duplicate Room ID.');
+    }
+  };
+
+  // 1. إضافة دالة تعديل الصورة
+  const handleEditRoomImage = async (roomId, currentImage) => {
+    const newImageUrl = window.prompt(t.promptImage, currentImage);
+    if (newImageUrl !== null && newImageUrl.trim() !== '') {
+      try {
+        const { error } = await supabase.from('rooms').update({ image_url: newImageUrl }).eq('room_id', roomId);
+        if (error) throw error;
+        setRooms(rooms.map(r => r.room_id === roomId ? { ...r, image_url: newImageUrl } : r));
+        alert(t.successUpdate);
+      } catch (error) {
+        alert("حدث خطأ أثناء تحديث الصورة.");
+      }
     }
   };
 
@@ -258,7 +265,6 @@ const AdminDashboard = () => {
           {t.title}
         </h1>
 
-        {/* 2. تبويبات الإدارة (أضيف الطلاب) */}
         <div className="flex gap-2 sm:gap-4 mb-8 border-b border-gray-200 pb-4 flex-wrap">
           <button onClick={() => setActiveTab('bookings')} className={`px-4 sm:px-6 py-2 font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === 'bookings' ? 'bg-[#5ca393] text-white' : 'bg-white text-gray-500 hover:bg-gray-200'}`}>
             {t.tabBookings}
@@ -267,16 +273,14 @@ const AdminDashboard = () => {
             {t.tabRooms}
           </button>
           <button onClick={() => setActiveTab('students')} className={`px-4 sm:px-6 py-2 font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === 'students' ? 'bg-[#5ca393] text-white' : 'bg-white text-gray-500 hover:bg-gray-200'}`}>
-            {t.tabStudents} {/* التبويب الجديد */}
+            {t.tabStudents}
           </button>
         </div>
 
         {loading ? (
           <div className="text-center text-xl font-bold text-gray-500 mt-20">...</div>
         ) : activeTab === 'bookings' ? (
-          // ================= تبويب الحجوزات =================
           <div>
-            {/* 3. لوحة إحصائيات الإيرادات */}
             <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-100 mb-8 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl">💰</div>
@@ -314,7 +318,6 @@ const AdminDashboard = () => {
                             {getRemainingDays(booking.created_at)} {t.days}
                           </td>
                           <td className={`p-4 ${lang === 'ar' ? 'text-right' : ''}`}>
-                            {/* 1. تعديل شكل حالة الدفع بعد الدفع */}
                             {booking.payment_status === 'paid' ? (
                                 <span className="text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full text-xs flex items-center gap-1 w-fit">
                                     {t.paidSuccess}
@@ -331,7 +334,6 @@ const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="p-4 flex gap-2 justify-center flex-wrap min-w-[200px]">
-                            {/* 1. إخفاء زر تأكيد الدفع بعد الدفع */}
                             {booking.payment_status !== 'paid' && (
                               <button onClick={() => updateBookingStatus(booking.booking_id, 'payment_status', 'paid')} className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-colors whitespace-nowrap">
                                 {t.markPaid}
@@ -355,9 +357,7 @@ const AdminDashboard = () => {
             )}
           </div>
         ) : activeTab === 'rooms' ? (
-          // ================= تبويب الغرف =================
           <div className="space-y-8">
-            {/* إضافة الغرفة (اختصار للمساحة) */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
               <form onSubmit={handleAddRoom} className="flex flex-col sm:flex-row gap-3">
                   <input type="text" required value={newRoomId} onChange={(e) => setNewRoomId(e.target.value)} placeholder={t.roomIdPlaceholder} className="w-full sm:w-28 p-2.5 border border-gray-300 rounded-lg" />
@@ -394,6 +394,9 @@ const AdminDashboard = () => {
                             <td className={`p-4 text-gray-600 font-bold ${lang === 'ar' ? 'text-right' : ''}`}>{room.price} EGP</td>
                             <td className={`p-4 ${lang === 'ar' ? 'text-right' : ''}`}><span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${room.status === 'available' ? 'bg-green-100 text-green-700' : room.status === 'booked' ? 'bg-blue-100 text-blue-700' : room.status === 'maintenance' ? 'bg-orange-100 text-orange-700' : 'bg-gray-200 text-gray-700'}`}>{room.status}</span>{room.status === 'maintenance' && room.maintenance_end && <CountdownTimer targetDate={room.maintenance_end} lang={lang} />}</td>
                             <td className="p-4 flex gap-2 justify-center items-center flex-wrap pt-5">
+                              {/* 1. زر تعديل الصورة */}
+                              <button onClick={() => handleEditRoomImage(room.room_id, room.image_url)} className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600">{t.btnEditImage}</button>
+                              
                               <button onClick={() => toggleRoomStatus(room.room_id, room.status)} className={`px-3 py-1.5 text-white text-xs font-bold rounded-lg ${room.status === 'maintenance' ? 'bg-green-500' : 'bg-orange-500'}`}>{room.status === 'maintenance' ? t.btnAvailable : t.btnMaintenance}</button>
                               <button onClick={() => handleDeleteRoom(room.room_id)} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg">{t.btnDelete}</button>
                             </td>
@@ -407,7 +410,6 @@ const AdminDashboard = () => {
             )}
           </div>
         ) : (
-          // ================= 2. تبويب إدارة الطلاب (الجدول الجديد) =================
           students.length === 0 ? (
             <div className="text-center mt-10 bg-white p-10 rounded-2xl shadow-sm border border-gray-200 text-xl font-bold text-gray-400">{t.noStudents}</div>
           ) : (
@@ -420,22 +422,64 @@ const AdminDashboard = () => {
                       <th className={`p-4 font-bold whitespace-nowrap ${lang === 'ar' ? 'text-right' : ''}`}>{t.studentName}</th>
                       <th className={`p-4 font-bold whitespace-nowrap ${lang === 'ar' ? 'text-right' : ''}`}>{t.email}</th>
                       <th className={`p-4 font-bold text-center whitespace-nowrap`}>{t.roomsBooked}</th>
+                      <th className={`p-4 font-bold text-center whitespace-nowrap`}>{t.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((student) => (
-                      <tr key={student.student_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className={`p-4 font-extrabold text-[#1b2a47] ${lang === 'ar' ? 'text-right' : ''}`}>{student.student_id}</td>
-                        <td className={`p-4 font-bold text-gray-700 ${lang === 'ar' ? 'text-right' : ''}`}>{student.student_name}</td>
-                        <td className={`p-4 text-gray-600 ${lang === 'ar' ? 'text-right' : ''}`} dir="ltr">{student.email}</td>
-                        <td className="p-4 text-center">
-                          <span className={`px-4 py-1.5 rounded-full font-extrabold text-lg 
-                            ${getStudentBookingCount(student.student_id) > 0 ? 'bg-[#5ca393]/10 text-[#5ca393]' : 'bg-gray-100 text-gray-400'}`}>
-                            {getStudentBookingCount(student.student_id)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {students.map((student) => {
+                      const studentBookings = getStudentBookingsList(student.student_id);
+                      const isExpanded = expandedStudentId === student.student_id;
+                      
+                      return (
+                        <React.Fragment key={student.student_id}>
+                          <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className={`p-4 font-extrabold text-[#1b2a47] ${lang === 'ar' ? 'text-right' : ''}`}>{student.student_id}</td>
+                            <td className={`p-4 font-bold text-gray-700 ${lang === 'ar' ? 'text-right' : ''}`}>{student.student_name}</td>
+                            <td className={`p-4 text-gray-600 ${lang === 'ar' ? 'text-right' : ''}`} dir="ltr">{student.email}</td>
+                            <td className="p-4 text-center">
+                              <span className={`px-4 py-1.5 rounded-full font-extrabold text-lg 
+                                ${studentBookings.length > 0 ? 'bg-[#5ca393]/10 text-[#5ca393]' : 'bg-gray-100 text-gray-400'}`}>
+                                {studentBookings.length}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              {/* 2. زر عرض/إخفاء الحجوزات */}
+                              <button 
+                                onClick={() => setExpandedStudentId(isExpanded ? null : student.student_id)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${isExpanded ? 'bg-gray-200 text-gray-600' : 'bg-[#1b2a47] text-white hover:bg-[#2a406b]'}`}
+                              >
+                                {isExpanded ? t.hideBookings : t.viewBookings}
+                              </button>
+                            </td>
+                          </tr>
+                          
+                          {/* عرض الحجوزات التابعة للطالب إذا تم فتح الزر */}
+                          {isExpanded && (
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              <td colSpan="5" className="p-4">
+                                {studentBookings.length === 0 ? (
+                                  <div className="text-gray-400 font-bold text-center py-2">{t.noBookings}</div>
+                                ) : (
+                                  <div className="grid gap-2">
+                                    {studentBookings.map(b => (
+                                      <div key={b.booking_id} className="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm">
+                                        <div className="font-bold text-[#1b2a47]">
+                                          <span className="text-gray-400 text-sm me-2">{t.room}:</span>{b.room_id}
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <span className={`px-2 py-1 rounded text-xs font-bold ${b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{b.payment_status}</span>
+                                          <span className={`px-2 py-1 rounded text-xs font-bold ${b.booking_status === 'confirmed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{b.booking_status}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

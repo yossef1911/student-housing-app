@@ -6,7 +6,8 @@ import LoginPage from './pages/LoginPage';
 import Rooms from './pages/Rooms';
 import MyBookings from './pages/MyBookings';
 import AdminDashboard from './pages/AdminDashboard';
-import Profile from './pages/Profile'; // 👈 1. استدعاء الصفحة
+import Profile from './pages/Profile';
+
 
 function App() {
   return (
@@ -18,7 +19,7 @@ function App() {
         <Route path="/rooms" element={<Rooms />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/profile" element={<Profile />} /> {/* 👈 2. إضافة المسار */}
+        <Route path="/profile" element={<Profile />} /> 
       </Routes>
     </Router>
   );
