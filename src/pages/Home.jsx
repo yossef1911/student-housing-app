@@ -7,7 +7,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [lang, setLang] = useState('en');
   const [user, setUser] = useState(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // 👈 حالة القائمة المنسدلة للجوال
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -60,6 +60,8 @@ const Home = () => {
   };
 
   const t = content[lang];
+  // السطر الذي كان مفقوداً وعاد الآن بنجاح!
+  const heroImage = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80";
   const userName = user?.user_metadata?.full_name || '';
 
   return (
