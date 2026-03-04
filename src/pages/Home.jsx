@@ -130,10 +130,13 @@ const Home = () => {
           <div className="md:hidden absolute top-full left-0 w-full bg-white border-t border-gray-100 shadow-xl flex flex-col p-5 gap-4 z-50 transition-all">
             {user ? (
               <>
-                <div className="pb-3 border-b border-gray-100 text-center">
-                  <span className="text-gray-500 block mb-1">{t.welcomeNav}</span>
-                  <span className="text-lg font-extrabold text-[#5ca393]">{userName}</span>
-                </div>
+                <button 
+                  onClick={() => { setIsMenuOpen(false); navigate('/profile'); }} 
+                  className="pb-3 border-b border-gray-100 text-center w-full hover:bg-gray-50 transition-colors rounded-lg cursor-pointer"
+                >
+                <span className="text-gray-500 block mb-1">{t.welcomeNav}</span>
+                <span className="text-lg font-extrabold text-[#5ca393] underline decoration-2 underline-offset-4">{userName}</span>
+                </button>
                 <button onClick={() => { setIsMenuOpen(false); navigate('/my-bookings'); }} className="py-2 text-[#1b2a47] font-bold text-center hover:bg-gray-50 rounded-lg">
                   {t.myBookings}
                 </button>
