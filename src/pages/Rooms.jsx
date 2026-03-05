@@ -105,25 +105,40 @@ const Rooms = () => {
   const executeBooking = async () => {
     const { room } = modalConfig;
     try {
-      // إدخال بيانات الحجز في الجدول
-      const { error: bookingError } = await supabase.from('bookings').insert([{
+      // 1. طباعة البيانات التي نحاول إرسالها لنتأكد أنها ليست فارغة
+      console.log("Data to send:", {
+        student_id: studentData?.student_id,
+        room_id: room.room_id,
+        payment_status: 'pending',
+        booking_status: 'pending'
+      });
+
+      // 2. إرسال الحجز
+      const { data, error: bookingError } = await supabase.from('bookings').insert([{
         student_id: studentData.student_id,
         room_id: room.room_id,
         payment_status: 'pending',
         booking_status: 'pending'
       }]);
-      if (bookingError) throw bookingError;
 
-      // تحديث حالة الغرفة لتصبح محجوزة
+      // 3. إذا رفضت قاعدة البيانات الحجز، ستطبع لنا السبب الدقيق هنا!
+      if (bookingError) {
+        console.error("Supabase Error:", bookingError);
+        alert("سبب رفض قاعدة البيانات: " + bookingError.message);
+        return; // نوقف إكمال الكود لكي لا تظهر الرسالة القديمة
+      }
+
+      // 4. تحديث حالة الغرفة
       const { error: roomError } = await supabase.from('rooms').update({ status: 'booked' }).eq('room_id', room.room_id);
       if (roomError) throw roomError;
 
       alert(t.successBooking);
       setModalConfig({ isOpen: false, type: null, room: null });
-      navigate('/my-bookings'); // توجيه الطالب لصفحة حجوزاته
+      navigate('/my-bookings');
 
     } catch (error) {
-      alert("حدث خطأ أثناء الحجز. قد تكون الغرفة محجوزة بالفعل أو أنك تملك حجزاً نشطاً.");
+      console.error("General error:", error);
+      alert("حدث خطأ عام. راجع الـ Console.");
       setModalConfig({ isOpen: false, type: null, room: null });
     }
   };
