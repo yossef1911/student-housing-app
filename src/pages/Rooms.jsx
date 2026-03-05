@@ -113,7 +113,7 @@ const Rooms = () => {
       const { error: bookingError } = await supabase.from('bookings').insert([{
         student_id: studentData.student_id,
         room_id: room.room_id,
-        payment_status: 'pending',
+        payment_status: 'unpaid',
         booking_status: 'pending',
         academic_year: academicYear // 👈 هذا هو السطر الذي حل المشكلة!
       }]);
