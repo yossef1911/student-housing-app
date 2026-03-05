@@ -105,30 +105,22 @@ const Rooms = () => {
   const executeBooking = async () => {
     const { room } = modalConfig;
     try {
-      // 1. طباعة البيانات التي نحاول إرسالها لنتأكد أنها ليست فارغة
-      console.log("Data to send:", {
-        student_id: studentData?.student_id,
-        room_id: room.room_id,
-        payment_status: 'pending',
-        booking_status: 'pending'
-      });
+      // حساب العام الدراسي تلقائياً (مثال: 2026/2027)
+      const currentYear = new Date().getFullYear();
+      const academicYear = `${currentYear}/${currentYear + 1}`;
 
-      // 2. إرسال الحجز
-      const { data, error: bookingError } = await supabase.from('bookings').insert([{
+      // إرسال الحجز مع إضافة عمود academic_year الإجباري
+      const { error: bookingError } = await supabase.from('bookings').insert([{
         student_id: studentData.student_id,
         room_id: room.room_id,
         payment_status: 'pending',
-        booking_status: 'pending'
+        booking_status: 'pending',
+        academic_year: academicYear // 👈 هذا هو السطر الذي حل المشكلة!
       }]);
 
-      // 3. إذا رفضت قاعدة البيانات الحجز، ستطبع لنا السبب الدقيق هنا!
-      if (bookingError) {
-        console.error("Supabase Error:", bookingError);
-        alert("سبب رفض قاعدة البيانات: " + bookingError.message);
-        return; // نوقف إكمال الكود لكي لا تظهر الرسالة القديمة
-      }
+      if (bookingError) throw bookingError;
 
-      // 4. تحديث حالة الغرفة
+      // تحديث حالة الغرفة لتصبح محجوزة
       const { error: roomError } = await supabase.from('rooms').update({ status: 'booked' }).eq('room_id', room.room_id);
       if (roomError) throw roomError;
 
@@ -137,8 +129,8 @@ const Rooms = () => {
       navigate('/my-bookings');
 
     } catch (error) {
-      console.error("General error:", error);
-      alert("حدث خطأ عام. راجع الـ Console.");
+      console.error("Booking error:", error);
+      alert("حدث خطأ أثناء الحجز: " + (error.message || "تأكد من البيانات"));
       setModalConfig({ isOpen: false, type: null, room: null });
     }
   };
