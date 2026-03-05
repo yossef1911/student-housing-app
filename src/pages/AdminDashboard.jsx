@@ -49,7 +49,7 @@ const AdminDashboard = () => {
 
   const [expandedStudentId, setExpandedStudentId] = useState(null);
 
-  // ================== نظام النوافذ المنبثقة الاحترافية (Modals) ==================
+  // نظام النوافذ المنبثقة
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, data: null });
   const [modalInput, setModalInput] = useState('');
 
@@ -66,18 +66,18 @@ const AdminDashboard = () => {
       paymentStatus: "Payment", bookingStatus: "Status", actions: "Actions",
       noBookings: "No bookings.", noRooms: "No rooms.", noStudents: "No students registered.",
       markPaid: "Mark Paid", markConfirmed: "Confirm", cancelBooking: "Cancel",
-      paidSuccess: "✅ Paid",
+      paidSuccess: "✅ Paid", canceled: "Canceled", refunded: "Refunded",
       timeLeft: "Time Left", days: "Days", occupant: "Occupant ID",
-      studentName: "Student Name", email: "Email", roomsBooked: "Rooms Booked",
+      studentName: "Student Name", email: "Email", roomsBooked: "Active Rooms",
       totalRevenue: "Total Revenue (Paid)", currency: "EGP",
       addRoom: "Add Room", roomIdPlaceholder: "ID (e.g. 104)", pricePlaceholder: "Price (e.g. 1500)", imagePlaceholder: "Image URL",
       btnAdd: "Add", btnDelete: "Delete", btnMaintenance: "Maintenance", btnAvailable: "Make Available",
-      btnEditImage: "Edit Image", viewBookings: "View Bookings", hideBookings: "Hide Bookings",
-      // نصوص القائمة السوداء والمودال
+      btnEditImage: "Edit Image", btnEditPrice: "Edit Price", viewBookings: "Booking History", hideBookings: "Hide History",
       btnBlock: "Block 🚫", btnUnblock: "Unblock ✅", blacklisted: "Blacklisted",
-      modalCancelTitle: "Cancel Booking", modalCancelText: "Cancelling this booking will put the room in maintenance for 10 days. Are you sure?",
+      modalCancelTitle: "Cancel Booking", modalCancelText: "Cancelling this booking will move it to history and put the room in maintenance. Are you sure?",
       modalDeleteTitle: "Delete Room", modalDeleteText: "Are you sure you want to permanently delete this room?",
-      modalEditTitle: "Edit Room Image", modalEditPlaceholder: "Paste the new image URL here...",
+      modalEditImageTitle: "Edit Room Image", modalEditImagePlaceholder: "Paste the new image URL here...",
+      modalEditPriceTitle: "Edit Room Price", modalEditPricePlaceholder: "Enter the new price...",
       btnModalCancel: "Go Back", btnModalConfirm: "Confirm", btnModalSave: "Save"
     },
     ar: {
@@ -87,18 +87,18 @@ const AdminDashboard = () => {
       paymentStatus: "حالة الدفع", bookingStatus: "الحجز", actions: "إجراءات",
       noBookings: "لا حجوزات.", noRooms: "لا غرف.", noStudents: "لا يوجد طلاب مسجلين.",
       markPaid: "تأكيد الدفع 🟢", markConfirmed: "تأكيد الحجز", cancelBooking: "إلغاء",
-      paidSuccess: "✅ تم الدفع",
+      paidSuccess: "✅ تم الدفع", canceled: "ملغي", refunded: "مسترد",
       timeLeft: "المتبقي الترم", days: "أيام", occupant: "كود الطالب",
-      studentName: "اسم الطالب", email: "الإيميل", roomsBooked: "الغرف المحجوزة",
+      studentName: "اسم الطالب", email: "الإيميل", roomsBooked: "الغرف النشطة",
       totalRevenue: "إجمالي الإيرادات (المحصلة)", currency: "جنية",
       addRoom: "إضافة غرفة", roomIdPlaceholder: "مثال 104", pricePlaceholder: "السعر مثال 1500", imagePlaceholder: "رابط الصورة",
       btnAdd: "إضافة", btnDelete: "حذف", btnMaintenance: "صيانة", btnAvailable: "إتاحة للطلاب",
-      btnEditImage: "تعديل الصورة", viewBookings: "عرض الحجوزات", hideBookings: "إخفاء الحجوزات",
-      // نصوص القائمة السوداء والمودال
+      btnEditImage: "تعديل الصورة", btnEditPrice: "تعديل السعر", viewBookings: "سجل الحجوزات", hideBookings: "إخفاء السجل",
       btnBlock: "حظر الطالب 🚫", btnUnblock: "إلغاء الحظر ✅", blacklisted: "محظور",
-      modalCancelTitle: "إلغاء الحجز", modalCancelText: "إلغاء هذا الحجز سيجعل الغرفة في حالة صيانة لمدة 10 أيام. هل أنت متأكد؟",
+      modalCancelTitle: "إلغاء الحجز", modalCancelText: "إلغاء هذا الحجز سيحوله إلى سجل الحجوزات الملغية ويجعل الغرفة في صيانة. هل أنت متأكد؟",
       modalDeleteTitle: "حذف الغرفة", modalDeleteText: "هل أنت متأكد من حذف هذه الغرفة نهائياً؟",
-      modalEditTitle: "تعديل صورة الغرفة", modalEditPlaceholder: "ضع رابط الصورة الجديد هنا...",
+      modalEditImageTitle: "تعديل صورة الغرفة", modalEditImagePlaceholder: "ضع رابط الصورة الجديد هنا...",
+      modalEditPriceTitle: "تعديل سعر الغرفة", modalEditPricePlaceholder: "أدخل السعر الجديد للغرفة...",
       btnModalCancel: "تراجع", btnModalConfirm: "تأكيد", btnModalSave: "حفظ"
     }
   }[lang];
@@ -125,7 +125,8 @@ const AdminDashboard = () => {
           setAllBookings(bookingsData);
           if(roomsData) {
               bookingsData.forEach(b => {
-                  if(b.payment_status === 'paid') {
+                  // حساب الإيرادات للحجوزات المدفوعة والغير ملغية فقط
+                  if(b.payment_status === 'paid' && b.booking_status !== 'canceled') {
                       const roomPrice = roomsData.find(r => r.room_id === b.room_id)?.price || 0;
                       tempRevenue += roomPrice;
                   }
@@ -134,7 +135,6 @@ const AdminDashboard = () => {
           setTotalRevenue(tempRevenue);
         }
 
-        // جلب بيانات الطلاب (الآن نجلب كل الأعمدة لضمان وجود is_blacklisted)
         const { data: studentsData } = await supabase.from('students').select('*');
         if (studentsData) setStudents(studentsData);
 
@@ -184,19 +184,29 @@ const AdminDashboard = () => {
 
     try {
       const booking = allBookings.find(b => b.booking_id === bookingId);
+      const newPaymentStatus = booking.payment_status === 'paid' ? 'refunded' : booking.payment_status;
+
+      // 1. تحديث الحجز ليصبح ملغي بدلاً من حذفه نهائياً
+      const { error: bookingError } = await supabase.from('bookings').update({ 
+        booking_status: 'canceled',
+        payment_status: newPaymentStatus
+      }).eq('booking_id', bookingId);
+      if (bookingError) throw bookingError;
+
+      // 2. تحديث حالة الغرفة لتصبح صيانة
+      const { error: roomError } = await supabase.from('rooms').update({ status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() }).eq('room_id', roomId);
+      if (roomError) throw roomError;
+
+      // خصم من الإيرادات إذا كان مدفوعاً
       if(booking.payment_status === 'paid') {
           const roomPrice = rooms.find(r => r.room_id === roomId)?.price || 0;
           setTotalRevenue(prev => prev - roomPrice);
       }
 
-      const { error: bookingError } = await supabase.from('bookings').delete().eq('booking_id', bookingId);
-      if (bookingError) throw bookingError;
-
-      const { error: roomError } = await supabase.from('rooms').update({ status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() }).eq('room_id', roomId);
-      if (roomError) throw roomError;
-
-      setAllBookings(allBookings.filter(b => b.booking_id !== bookingId));
+      // 3. تحديث الواجهة
+      setAllBookings(allBookings.map(b => b.booking_id === bookingId ? { ...b, booking_status: 'canceled', payment_status: newPaymentStatus } : b));
       setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() } : r));
+      
       closeModal();
     } catch (error) {
       alert("حدث خطأ.");
@@ -211,7 +221,7 @@ const AdminDashboard = () => {
       setRooms(rooms.filter(r => r.room_id !== roomId));
       closeModal();
     } catch (error) {
-      alert(lang === 'ar' ? 'لا يمكن الحذف، الغرفة بها حجوزات مسجلة.' : 'Cannot delete, room has bookings.');
+      alert(lang === 'ar' ? 'لا يمكن الحذف، الغرفة بها حجوزات مسجلة (حتى لو كانت ملغية).' : 'Cannot delete, room has history.');
       closeModal();
     }
   };
@@ -229,7 +239,21 @@ const AdminDashboard = () => {
     }
   };
 
-  // ================== دالة حظر الطالب ==================
+  // دالة تعديل السعر
+  const executeEditPrice = async () => {
+    const { roomId } = modalConfig.data;
+    const newPrice = Number(modalInput);
+    if (!newPrice || isNaN(newPrice)) return;
+    try {
+      const { error } = await supabase.from('rooms').update({ price: newPrice }).eq('room_id', roomId);
+      if (error) throw error;
+      setRooms(rooms.map(r => r.room_id === roomId ? { ...r, price: newPrice } : r));
+      closeModal();
+    } catch (error) {
+      alert("حدث خطأ أثناء التحديث.");
+    }
+  };
+
   const toggleStudentBlacklist = async (studentId, currentStatus) => {
     const newStatus = !currentStatus;
     try {
@@ -237,7 +261,7 @@ const AdminDashboard = () => {
       if (error) throw error;
       setStudents(students.map(s => s.student_id === studentId ? { ...s, is_blacklisted: newStatus } : s));
     } catch (error) {
-      alert("حدث خطأ أثناء تعديل حالة الطالب. تأكد من إضافة عمود is_blacklisted في قاعدة البيانات.");
+      alert("حدث خطأ.");
     }
   };
 
@@ -279,27 +303,23 @@ const AdminDashboard = () => {
   return (
     <div className={`min-h-screen bg-gray-100 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
-      {/* ================== شاشة المودال (النافذة المنبثقة) ================== */}
+      {/* ================== شاشة المودال ================== */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
             <div className="p-6 border-b border-gray-100">
               <h3 className="text-xl font-extrabold text-[#1b2a47]">
-                {modalConfig.type === 'editImage' ? t.modalEditTitle : 
+                {modalConfig.type === 'editImage' ? t.modalEditImageTitle : 
+                 modalConfig.type === 'editPrice' ? t.modalEditPriceTitle :
                  modalConfig.type === 'deleteRoom' ? t.modalDeleteTitle : t.modalCancelTitle}
               </h3>
             </div>
             
             <div className="p-6 text-gray-600 font-bold">
               {modalConfig.type === 'editImage' ? (
-                <input 
-                  type="text" 
-                  value={modalInput} 
-                  onChange={(e) => setModalInput(e.target.value)} 
-                  placeholder={t.modalEditPlaceholder} 
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#5ca393]"
-                  dir="ltr"
-                />
+                <input type="text" value={modalInput} onChange={(e) => setModalInput(e.target.value)} placeholder={t.modalEditImagePlaceholder} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#5ca393]" dir="ltr" />
+              ) : modalConfig.type === 'editPrice' ? (
+                <input type="number" value={modalInput} onChange={(e) => setModalInput(e.target.value)} onKeyDown={handlePriceKeyDown} placeholder={t.modalEditPricePlaceholder} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#5ca393]" dir="ltr" />
               ) : modalConfig.type === 'deleteRoom' ? (
                 <p className="text-red-500">{t.modalDeleteText} الغرفة: {modalConfig.data?.roomId}</p>
               ) : (
@@ -308,20 +328,19 @@ const AdminDashboard = () => {
             </div>
 
             <div className="p-4 bg-gray-50 flex justify-end gap-3">
-              <button onClick={closeModal} className="px-5 py-2 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors">
-                {t.btnModalCancel}
-              </button>
+              <button onClick={closeModal} className="px-5 py-2 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors">{t.btnModalCancel}</button>
               <button 
                 onClick={() => {
                   if(modalConfig.type === 'editImage') executeEditImage();
+                  if(modalConfig.type === 'editPrice') executeEditPrice();
                   if(modalConfig.type === 'deleteRoom') executeDeleteRoom();
                   if(modalConfig.type === 'cancelBooking') executeCancelBooking();
                 }} 
                 className={`px-5 py-2 text-white font-bold rounded-lg transition-colors shadow-md ${
-                  modalConfig.type === 'editImage' ? 'bg-[#5ca393] hover:bg-[#458b7c]' : 'bg-red-500 hover:bg-red-600'
+                  (modalConfig.type === 'editImage' || modalConfig.type === 'editPrice') ? 'bg-[#5ca393] hover:bg-[#458b7c]' : 'bg-red-500 hover:bg-red-600'
                 }`}
               >
-                {modalConfig.type === 'editImage' ? t.btnModalSave : t.btnModalConfirm}
+                {(modalConfig.type === 'editImage' || modalConfig.type === 'editPrice') ? t.btnModalSave : t.btnModalConfirm}
               </button>
             </div>
           </div>
@@ -341,9 +360,7 @@ const AdminDashboard = () => {
       </nav>
 
       <div className="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
-        <h1 className="text-3xl md:text-4xl font-extrabold text-[#1b2a47] mb-8 border-b-4 border-[#5ca393] inline-block pb-2">
-          {t.title}
-        </h1>
+        <h1 className="text-3xl md:text-4xl font-extrabold text-[#1b2a47] mb-8 border-b-4 border-[#5ca393] inline-block pb-2">{t.title}</h1>
 
         <div className="flex gap-2 sm:gap-4 mb-8 border-b border-gray-200 pb-4 flex-wrap">
           <button onClick={() => setActiveTab('bookings')} className={`px-4 sm:px-6 py-2 font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === 'bookings' ? 'bg-[#5ca393] text-white' : 'bg-white text-gray-500 hover:bg-gray-200'}`}>{t.tabBookings}</button>
@@ -384,38 +401,42 @@ const AdminDashboard = () => {
                     </thead>
                     <tbody>
                       {allBookings.map((booking) => (
-                        <tr key={booking.booking_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <tr key={booking.booking_id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${booking.booking_status === 'canceled' ? 'opacity-60 bg-gray-50' : ''}`}>
                           <td className={`p-4 font-extrabold text-[#1b2a47] ${lang === 'ar' ? 'text-right' : ''}`}>{booking.booking_id}</td>
                           <td className={`p-4 text-[#5ca393] font-bold ${lang === 'ar' ? 'text-right' : ''}`}>{booking.student_id}</td>
                           <td className={`p-4 font-bold text-gray-700 ${lang === 'ar' ? 'text-right' : ''}`}>{booking.room_id}</td>
                           <td className={`p-4 font-bold text-orange-500 ${lang === 'ar' ? 'text-right' : ''}`}>
-                            {getRemainingDays(booking.created_at)} {t.days}
+                            {booking.booking_status !== 'canceled' ? `${getRemainingDays(booking.created_at)} ${t.days}` : '-'}
                           </td>
                           <td className={`p-4 ${lang === 'ar' ? 'text-right' : ''}`}>
                             {booking.payment_status === 'paid' ? (
-                                <span className="text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full text-xs flex items-center gap-1 w-fit">{t.paidSuccess}</span>
+                                <span className="text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full text-xs">{t.paidSuccess}</span>
+                            ) : booking.payment_status === 'refunded' ? (
+                                <span className="text-gray-500 font-bold bg-gray-200 px-3 py-1 rounded-full text-xs">{t.refunded}</span>
                             ) : (
                                 <span className="px-3 py-1 rounded-full text-xs font-bold capitalize bg-yellow-100 text-yellow-700">{booking.payment_status}</span>
                             )}
                           </td>
                           <td className={`p-4 ${lang === 'ar' ? 'text-right' : ''}`}>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${booking.booking_status === 'confirmed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{booking.booking_status}</span>
+                            {booking.booking_status === 'canceled' ? (
+                                <span className="px-3 py-1 rounded-full text-xs font-bold capitalize bg-red-100 text-red-700">{t.canceled}</span>
+                            ) : (
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${booking.booking_status === 'confirmed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{booking.booking_status}</span>
+                            )}
                           </td>
                           <td className="p-4 flex gap-2 justify-center flex-wrap min-w-[200px]">
-                            {booking.payment_status !== 'paid' && (
-                              <button onClick={() => updateBookingStatus(booking.booking_id, 'payment_status', 'paid')} className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600">
-                                {t.markPaid}
-                              </button>
+                            {/* إخفاء الأزرار إذا كان الحجز ملغياً أصلاً */}
+                            {booking.booking_status !== 'canceled' && (
+                              <>
+                                {booking.payment_status !== 'paid' && (
+                                  <button onClick={() => updateBookingStatus(booking.booking_id, 'payment_status', 'paid')} className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600">{t.markPaid}</button>
+                                )}
+                                {booking.booking_status !== 'confirmed' && (
+                                  <button onClick={() => updateBookingStatus(booking.booking_id, 'booking_status', 'confirmed')} className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600">{t.markConfirmed}</button>
+                                )}
+                                <button onClick={() => setModalConfig({ isOpen: true, type: 'cancelBooking', data: { bookingId: booking.booking_id, roomId: booking.room_id } })} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600">{t.cancelBooking}</button>
+                              </>
                             )}
-                            {booking.booking_status !== 'confirmed' && (
-                              <button onClick={() => updateBookingStatus(booking.booking_id, 'booking_status', 'confirmed')} className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600">
-                                {t.markConfirmed}
-                              </button>
-                            )}
-                            {/* تغيير الزر ليفتح المودال */}
-                            <button onClick={() => setModalConfig({ isOpen: true, type: 'cancelBooking', data: { bookingId: booking.booking_id, roomId: booking.room_id } })} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600">
-                              {t.cancelBooking}
-                            </button>
                           </td>
                         </tr>
                       ))}
@@ -454,7 +475,8 @@ const AdminDashboard = () => {
                     </thead>
                     <tbody>
                       {rooms.map((room) => {
-                        const activeBooking = allBookings.find(b => b.room_id === room.room_id);
+                        // التأكد من أن الحجز الذي نعرضه في الغرفة ليس ملغياً
+                        const activeBooking = allBookings.find(b => b.room_id === room.room_id && b.booking_status !== 'canceled');
                         return (
                           <tr key={room.room_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                             <td className="p-4"><img src={room.image_url || "https://images.unsplash.com/photo-1522771731478-44eb10e5c836?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"} alt="room" className="w-16 h-12 object-cover rounded-md border" /></td>
@@ -464,12 +486,12 @@ const AdminDashboard = () => {
                             <td className={`p-4 ${lang === 'ar' ? 'text-right' : ''}`}><span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${room.status === 'available' ? 'bg-green-100 text-green-700' : room.status === 'booked' ? 'bg-blue-100 text-blue-700' : room.status === 'maintenance' ? 'bg-orange-100 text-orange-700' : 'bg-gray-200 text-gray-700'}`}>{room.status}</span>{room.status === 'maintenance' && room.maintenance_end && <CountdownTimer targetDate={room.maintenance_end} lang={lang} />}</td>
                             <td className="p-4 flex gap-2 justify-center items-center flex-wrap pt-5">
                               
-                              {/* تعديل ليفتح المودال بدلاً من Prompt */}
+                              <button onClick={() => { setModalInput(room.price); setModalConfig({ isOpen: true, type: 'editPrice', data: { roomId: room.room_id } }); }} className="px-3 py-1.5 bg-purple-500 text-white text-xs font-bold rounded-lg hover:bg-purple-600">{t.btnEditPrice}</button>
+                              
                               <button onClick={() => { setModalInput(room.image_url || ''); setModalConfig({ isOpen: true, type: 'editImage', data: { roomId: room.room_id } }); }} className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600">{t.btnEditImage}</button>
                               
                               <button onClick={() => toggleRoomStatus(room.room_id, room.status)} className={`px-3 py-1.5 text-white text-xs font-bold rounded-lg ${room.status === 'maintenance' ? 'bg-green-500' : 'bg-orange-500'}`}>{room.status === 'maintenance' ? t.btnAvailable : t.btnMaintenance}</button>
                               
-                              {/* تعديل ليفتح المودال بدلاً من Confirm */}
                               <button onClick={() => setModalConfig({ isOpen: true, type: 'deleteRoom', data: { roomId: room.room_id } })} className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600">{t.btnDelete}</button>
                             </td>
                           </tr>
@@ -499,7 +521,9 @@ const AdminDashboard = () => {
                   </thead>
                   <tbody>
                     {students.map((student) => {
-                      const studentBookings = getStudentBookingsList(student.student_id);
+                      const studentBookingsHistory = getStudentBookingsList(student.student_id);
+                      // حساب الغرف النشطة فقط (غير ملغية) لتظهر في الدائرة الخضراء
+                      const activeRoomsCount = studentBookingsHistory.filter(b => b.booking_status !== 'canceled').length;
                       const isExpanded = expandedStudentId === student.student_id;
                       
                       return (
@@ -507,14 +531,13 @@ const AdminDashboard = () => {
                           <tr className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${student.is_blacklisted ? 'bg-red-50/50' : ''}`}>
                             <td className={`p-4 font-extrabold text-[#1b2a47] ${lang === 'ar' ? 'text-right' : ''}`}>
                               {student.student_id}
-                              {/* إظهار علامة محظور إذا كان محظوراً */}
                               {student.is_blacklisted && <span className="ml-2 rtl:mr-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">{t.blacklisted}</span>}
                             </td>
                             <td className={`p-4 font-bold text-gray-700 ${lang === 'ar' ? 'text-right' : ''}`}>{student.student_name}</td>
                             <td className={`p-4 text-gray-600 ${lang === 'ar' ? 'text-right' : ''}`} dir="ltr">{student.email}</td>
                             <td className="p-4 text-center">
-                              <span className={`px-4 py-1.5 rounded-full font-extrabold text-lg ${studentBookings.length > 0 ? 'bg-[#5ca393]/10 text-[#5ca393]' : 'bg-gray-100 text-gray-400'}`}>
-                                {studentBookings.length}
+                              <span className={`px-4 py-1.5 rounded-full font-extrabold text-lg ${activeRoomsCount > 0 ? 'bg-[#5ca393]/10 text-[#5ca393]' : 'bg-gray-100 text-gray-400'}`}>
+                                {activeRoomsCount}
                               </span>
                             </td>
                             <td className="p-4 flex gap-2 justify-center flex-wrap">
@@ -525,7 +548,6 @@ const AdminDashboard = () => {
                                 {isExpanded ? t.hideBookings : t.viewBookings}
                               </button>
                               
-                              {/* زر الحظر / فك الحظر الجديد */}
                               <button 
                                 onClick={() => toggleStudentBlacklist(student.student_id, student.is_blacklisted)}
                                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors text-white shadow-sm ${student.is_blacklisted ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
@@ -535,21 +557,31 @@ const AdminDashboard = () => {
                             </td>
                           </tr>
                           
+                          {/* عرض التاريخ الكامل (تاريخ الحجوزات والملغية) */}
                           {isExpanded && (
                             <tr className="bg-gray-50 border-b border-gray-200">
                               <td colSpan="5" className="p-4 shadow-inner">
-                                {studentBookings.length === 0 ? (
+                                {studentBookingsHistory.length === 0 ? (
                                   <div className="text-gray-400 font-bold text-center py-2">{t.noBookings}</div>
                                 ) : (
                                   <div className="grid gap-2">
-                                    {studentBookings.map(b => (
-                                      <div key={b.booking_id} className="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm">
+                                    {studentBookingsHistory.map(b => (
+                                      <div key={b.booking_id} className={`flex justify-between items-center bg-white p-3 rounded border shadow-sm ${b.booking_status === 'canceled' ? 'border-red-200 opacity-75' : 'border-gray-200'}`}>
                                         <div className="font-bold text-[#1b2a47]">
                                           <span className="text-gray-400 text-sm me-2">{t.room}:</span>{b.room_id}
                                         </div>
                                         <div className="flex gap-2">
-                                          <span className={`px-2 py-1 rounded text-xs font-bold ${b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{b.payment_status}</span>
-                                          <span className={`px-2 py-1 rounded text-xs font-bold ${b.booking_status === 'confirmed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{b.booking_status}</span>
+                                          {b.booking_status === 'canceled' ? (
+                                            <>
+                                              <span className="px-2 py-1 rounded text-xs font-bold bg-gray-200 text-gray-600">{b.payment_status === 'refunded' ? t.refunded : b.payment_status}</span>
+                                              <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700">{t.canceled}</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span className={`px-2 py-1 rounded text-xs font-bold ${b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{b.payment_status}</span>
+                                              <span className={`px-2 py-1 rounded text-xs font-bold ${b.booking_status === 'confirmed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}`}>{b.booking_status}</span>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
                                     ))}
