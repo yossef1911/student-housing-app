@@ -49,12 +49,12 @@ const AdminDashboard = () => {
 
   const [expandedStudentId, setExpandedStudentId] = useState(null);
 
-  // نظام النوافذ المنبثقة
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, data: null });
+  // 👈 إضافة message لاستخدامها في إظهار رسائل الخطأ داخل المودال
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, data: null, message: '' });
   const [modalInput, setModalInput] = useState('');
 
   const closeModal = () => {
-    setModalConfig({ isOpen: false, type: null, data: null });
+    setModalConfig({ isOpen: false, type: null, data: null, message: '' });
     setModalInput('');
   };
 
@@ -78,7 +78,15 @@ const AdminDashboard = () => {
       modalDeleteTitle: "Delete Room", modalDeleteText: "Are you sure you want to permanently delete this room?",
       modalEditImageTitle: "Edit Room Image", modalEditImagePlaceholder: "Paste the new image URL here...",
       modalEditPriceTitle: "Edit Room Price", modalEditPricePlaceholder: "Enter the new price...",
-      btnModalCancel: "Go Back", btnModalConfirm: "Confirm", btnModalSave: "Save"
+      btnModalCancel: "Go Back", btnModalConfirm: "Confirm", btnModalSave: "Save",
+      // 👈 نصوص الأخطاء الذكية
+      modalErrorTitle: "Notice ❌",
+      btnOkay: "OK",
+      errorDuplicateRoom: "Duplicate Room ID. This room already exists.",
+      errorHasHistory: "Cannot delete, room has booking history.",
+      errorUpdate: "An error occurred during update.",
+      errorGeneral: "An unexpected error occurred.",
+      errorAuth: "Access Denied."
     },
     ar: {
       toggleLang: "English", logout: "خروج", title: "لوحة تحكم الإدارة",
@@ -99,7 +107,15 @@ const AdminDashboard = () => {
       modalDeleteTitle: "حذف الغرفة", modalDeleteText: "هل أنت متأكد من حذف هذه الغرفة نهائياً؟",
       modalEditImageTitle: "تعديل صورة الغرفة", modalEditImagePlaceholder: "ضع رابط الصورة الجديد هنا...",
       modalEditPriceTitle: "تعديل سعر الغرفة", modalEditPricePlaceholder: "أدخل السعر الجديد للغرفة...",
-      btnModalCancel: "تراجع", btnModalConfirm: "تأكيد", btnModalSave: "حفظ"
+      btnModalCancel: "تراجع", btnModalConfirm: "تأكيد", btnModalSave: "حفظ",
+      // 👈 نصوص الأخطاء الذكية
+      modalErrorTitle: "تنبيه ❌",
+      btnOkay: "حسناً",
+      errorDuplicateRoom: "رقم الغرفة مكرر. هذه الغرفة مسجلة بالفعل.",
+      errorHasHistory: "لا يمكن الحذف، الغرفة بها حجوزات مسجلة (حتى لو كانت ملغية).",
+      errorUpdate: "حدث خطأ أثناء التحديث.",
+      errorGeneral: "حدث خطأ غير متوقع.",
+      errorAuth: "غير مصرح لك بالدخول."
     }
   }[lang];
 
@@ -111,8 +127,9 @@ const AdminDashboard = () => {
 
         const { data: adminData } = await supabase.from('admins').select('*').eq('auth_id', session.user.id).single();
         if (!adminData) {
-          alert(lang === 'ar' ? 'غير مصرح.' : 'Access Denied.');
-          return navigate('/');
+          setModalConfig({ isOpen: true, type: 'error', message: t.errorAuth });
+          setTimeout(() => navigate('/'), 2000);
+          return;
         }
 
         const { data: bookingsData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
@@ -170,7 +187,7 @@ const AdminDashboard = () => {
           setTotalRevenue(prev => prev + roomPrice);
       }
     } catch (error) {
-      alert("حدث خطأ.");
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorGeneral });
     }
   };
 
@@ -185,37 +202,34 @@ const AdminDashboard = () => {
       const booking = allBookings.find(b => b.booking_id === bookingId);
       const newPaymentStatus = booking.payment_status === 'paid' ? 'refunded' : booking.payment_status;
 
-      // 1. محاولة تحديث الحجز وتغييره إلى ملغي
       const { error: bookingError } = await supabase.from('bookings').update({ 
         booking_status: 'canceled',
         payment_status: newPaymentStatus
       }).eq('booking_id', bookingId);
 
-      // 2. معالجة الخطأ بذكاء إذا رفضت قاعدة البيانات الكلمات الجديدة
       if (bookingError) {
-        console.error("Supabase Error:", bookingError);
-        alert("قاعدة البيانات ترفض حالة الإلغاء بسبب القيود الصارمة (Constraints).\n\nيرجى فتح الـ SQL Editor في Supabase وتنفيذ الكود الذي أرسلته لك لحل المشكلة نهائياً.");
-        closeModal();
+        setModalConfig({ 
+          isOpen: true, 
+          type: 'error', 
+          message: lang === 'ar' ? "قاعدة البيانات ترفض حالة الإلغاء بسبب القيود الصارمة (Constraints).\n\nيرجى فتح الـ SQL Editor في Supabase وتنفيذ الكود لحل المشكلة نهائياً." : "Database constraint error. Please run the SQL fix."
+        });
         return;
       }
 
-      // 3. تحديث حالة الغرفة لتصبح صيانة
       const { error: roomError } = await supabase.from('rooms').update({ status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() }).eq('room_id', roomId);
       if (roomError) throw roomError;
 
-      // 4. خصم من الإيرادات إذا كان مدفوعاً
       if(booking.payment_status === 'paid') {
           const roomPrice = rooms.find(r => r.room_id === roomId)?.price || 0;
           setTotalRevenue(prev => prev - roomPrice);
       }
 
-      // 5. تحديث الواجهة
       setAllBookings(allBookings.map(b => b.booking_id === bookingId ? { ...b, booking_status: 'canceled', payment_status: newPaymentStatus } : b));
       setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() } : r));
       
       closeModal();
     } catch (error) {
-      alert("حدث خطأ عام: " + error.message);
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorGeneral + " " + error.message });
     }
   };
 
@@ -227,8 +241,7 @@ const AdminDashboard = () => {
       setRooms(rooms.filter(r => r.room_id !== roomId));
       closeModal();
     } catch (error) {
-      alert(lang === 'ar' ? 'لا يمكن الحذف، الغرفة بها حجوزات مسجلة (حتى لو كانت ملغية).' : 'Cannot delete, room has history.');
-      closeModal();
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorHasHistory });
     }
   };
 
@@ -241,7 +254,7 @@ const AdminDashboard = () => {
       setRooms(rooms.map(r => r.room_id === roomId ? { ...r, image_url: modalInput } : r));
       closeModal();
     } catch (error) {
-      alert("حدث خطأ أثناء التحديث.");
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorUpdate });
     }
   };
 
@@ -255,7 +268,7 @@ const AdminDashboard = () => {
       setRooms(rooms.map(r => r.room_id === roomId ? { ...r, price: newPrice } : r));
       closeModal();
     } catch (error) {
-      alert("حدث خطأ أثناء التحديث.");
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorUpdate });
     }
   };
 
@@ -266,7 +279,7 @@ const AdminDashboard = () => {
       if (error) throw error;
       setStudents(students.map(s => s.student_id === studentId ? { ...s, is_blacklisted: newStatus } : s));
     } catch (error) {
-      alert("حدث خطأ.");
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorGeneral });
     }
   };
 
@@ -283,7 +296,8 @@ const AdminDashboard = () => {
       setRooms([...rooms, { room_id: newRoomId, price: Number(newRoomPrice), status: 'available', image_url: newRoomImage || defaultImage }]);
       setNewRoomId(''); setNewRoomPrice(''); setNewRoomImage('');
     } catch (error) {
-      alert(lang === 'ar' ? 'رقم الغرفة مكرر.' : 'Duplicate Room ID.');
+      // 👈 بدلاً من الـ alert الذي أرسلته في الصورة، ستظهر نافذة أنيقة
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorDuplicateRoom });
     }
   };
 
@@ -298,7 +312,7 @@ const AdminDashboard = () => {
       if (error) throw error;
       setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: newStatus, maintenance_end: maintenanceEnd } : r));
     } catch (error) {
-      alert("حدث خطأ.");
+      setModalConfig({ isOpen: true, type: 'error', message: t.errorGeneral });
     }
   };
 
@@ -308,15 +322,17 @@ const AdminDashboard = () => {
   return (
     <div className={`min-h-screen bg-gray-100 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
-      {/* ================== شاشة المودال ================== */}
+      {/* ================== شاشة المودال الاحترافية ================== */}
       {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-xl font-extrabold text-[#1b2a47]">
+            
+            <div className={`p-6 border-b border-gray-100 ${modalConfig.type === 'error' ? 'bg-red-50' : 'bg-white'}`}>
+              <h3 className={`text-xl font-extrabold ${modalConfig.type === 'error' ? 'text-red-600' : 'text-[#1b2a47]'}`}>
                 {modalConfig.type === 'editImage' ? t.modalEditImageTitle : 
                  modalConfig.type === 'editPrice' ? t.modalEditPriceTitle :
-                 modalConfig.type === 'deleteRoom' ? t.modalDeleteTitle : t.modalCancelTitle}
+                 modalConfig.type === 'deleteRoom' ? t.modalDeleteTitle : 
+                 modalConfig.type === 'error' ? t.modalErrorTitle : t.modalCancelTitle}
               </h3>
             </div>
             
@@ -327,26 +343,36 @@ const AdminDashboard = () => {
                 <input type="number" value={modalInput} onChange={(e) => setModalInput(e.target.value)} onKeyDown={handlePriceKeyDown} placeholder={t.modalEditPricePlaceholder} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#5ca393]" dir="ltr" />
               ) : modalConfig.type === 'deleteRoom' ? (
                 <p className="text-red-500">{t.modalDeleteText} الغرفة: {modalConfig.data?.roomId}</p>
+              ) : modalConfig.type === 'error' ? (
+                <p className="text-red-500 whitespace-pre-line leading-relaxed">{modalConfig.message}</p>
               ) : (
                 <p className="text-orange-500">{t.modalCancelText}</p>
               )}
             </div>
 
             <div className="p-4 bg-gray-50 flex justify-end gap-3">
-              <button onClick={closeModal} className="px-5 py-2 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors">{t.btnModalCancel}</button>
-              <button 
-                onClick={() => {
-                  if(modalConfig.type === 'editImage') executeEditImage();
-                  if(modalConfig.type === 'editPrice') executeEditPrice();
-                  if(modalConfig.type === 'deleteRoom') executeDeleteRoom();
-                  if(modalConfig.type === 'cancelBooking') executeCancelBooking();
-                }} 
-                className={`px-5 py-2 text-white font-bold rounded-lg transition-colors shadow-md ${
-                  (modalConfig.type === 'editImage' || modalConfig.type === 'editPrice') ? 'bg-[#5ca393] hover:bg-[#458b7c]' : 'bg-red-500 hover:bg-red-600'
-                }`}
-              >
-                {(modalConfig.type === 'editImage' || modalConfig.type === 'editPrice') ? t.btnModalSave : t.btnModalConfirm}
-              </button>
+              {modalConfig.type === 'error' ? (
+                <button onClick={closeModal} className="px-5 py-2.5 bg-red-500 text-white font-bold hover:bg-red-600 rounded-lg transition-colors shadow-md">
+                  {t.btnOkay}
+                </button>
+              ) : (
+                <>
+                  <button onClick={closeModal} className="px-5 py-2.5 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors">{t.btnModalCancel}</button>
+                  <button 
+                    onClick={() => {
+                      if(modalConfig.type === 'editImage') executeEditImage();
+                      if(modalConfig.type === 'editPrice') executeEditPrice();
+                      if(modalConfig.type === 'deleteRoom') executeDeleteRoom();
+                      if(modalConfig.type === 'cancelBooking') executeCancelBooking();
+                    }} 
+                    className={`px-5 py-2.5 text-white font-bold rounded-lg transition-colors shadow-md ${
+                      (modalConfig.type === 'editImage' || modalConfig.type === 'editPrice') ? 'bg-[#5ca393] hover:bg-[#458b7c]' : 'bg-red-500 hover:bg-red-600'
+                    }`}
+                  >
+                    {(modalConfig.type === 'editImage' || modalConfig.type === 'editPrice') ? t.btnModalSave : t.btnModalConfirm}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -430,7 +456,6 @@ const AdminDashboard = () => {
                             )}
                           </td>
                           <td className="p-4 flex gap-2 justify-center flex-wrap min-w-[200px]">
-                            {/* إخفاء الأزرار إذا كان الحجز ملغياً أصلاً */}
                             {booking.booking_status !== 'canceled' && (
                               <>
                                 {booking.payment_status !== 'paid' && (
@@ -480,7 +505,6 @@ const AdminDashboard = () => {
                     </thead>
                     <tbody>
                       {rooms.map((room) => {
-                        // التأكد من أن الحجز الذي نعرضه في الغرفة ليس ملغياً
                         const activeBooking = allBookings.find(b => b.room_id === room.room_id && b.booking_status !== 'canceled');
                         return (
                           <tr key={room.room_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -527,7 +551,6 @@ const AdminDashboard = () => {
                   <tbody>
                     {students.map((student) => {
                       const studentBookingsHistory = getStudentBookingsList(student.student_id);
-                      // حساب الغرف النشطة فقط (غير ملغية) لتظهر في الدائرة الخضراء
                       const activeRoomsCount = studentBookingsHistory.filter(b => b.booking_status !== 'canceled').length;
                       const isExpanded = expandedStudentId === student.student_id;
                       
@@ -562,7 +585,6 @@ const AdminDashboard = () => {
                             </td>
                           </tr>
                           
-                          {/* عرض التاريخ الكامل (تاريخ الحجوزات والملغية) */}
                           {isExpanded && (
                             <tr className="bg-gray-50 border-b border-gray-200">
                               <td colSpan="5" className="p-4 shadow-inner">
