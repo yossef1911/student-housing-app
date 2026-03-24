@@ -20,7 +20,7 @@ const Signup = () => {
       login: "Login", toggleLang: "عربي",
       joinTitle: "Join the UniHome Community",
       namePlaceholder: "Name",
-      idPlaceholder: "Student ID (Min 6 digits)", // 👈 تعديل النص هنا
+      idPlaceholder: "Student ID (Min 6 digits)",
       emailPlaceholder: "Email",
       passPlaceholder: "Password",
       confirmPassPlaceholder: "Confirm Password",
@@ -29,15 +29,19 @@ const Signup = () => {
       loginHere: "Login here",
       gmailError: "Email must end with @gmail.com only.",
       matchError: "Passwords do not match.",
-      idLengthError: "Student ID must be at least 6 digits.", // 👈 رسالة خطأ جديدة
-      dbError: "Error saving data. The Student ID might already be registered.",
+      idLengthError: "Student ID must be at least 6 digits.",
+      // أخطاء ذكية جديدة بالإنجليزية
+      emailInUseError: "This email is already registered. Please login.",
+      weakPasswordError: "Password must be at least 6 characters.",
+      duplicateIdError: "This Student ID is already registered in our system.",
+      generalError: "An unexpected error occurred. Please try again.",
       successMsg: "Account created successfully!"
     },
     ar: {
       login: "دخول", toggleLang: "English",
       joinTitle: "انضم إلى مجتمع UniHome",
       namePlaceholder: "الاسم باللغة الإنجليزية", 
-      idPlaceholder: "الرقم الجامعي (6 أرقام على الأقل)", // 👈 تعديل النص هنا
+      idPlaceholder: "الرقم الجامعي (6 أرقام على الأقل)",
       emailPlaceholder: "البريد الإلكتروني",
       passPlaceholder: "كلمة المرور",
       confirmPassPlaceholder: "تأكيد كلمة المرور",
@@ -46,8 +50,12 @@ const Signup = () => {
       loginHere: "سجل دخولك هنا",
       gmailError: "يجب أن ينتهي البريد الإلكتروني بـ @gmail.com فقط.",
       matchError: "كلمتا المرور غير متطابقتين.",
-      idLengthError: "يجب أن يتكون الرقم الجامعي من 6 أرقام على الأقل.", // 👈 رسالة خطأ جديدة
-      dbError: "حدث خطأ أثناء الحفظ. قد يكون الرقم الجامعي مسجلاً بالفعل.",
+      idLengthError: "يجب أن يتكون الرقم الجامعي من 6 أرقام على الأقل.",
+      // أخطاء ذكية جديدة بالعربية
+      emailInUseError: "هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول.",
+      weakPasswordError: "كلمة المرور ضعيفة (يجب أن تتكون من 6 أحرف على الأقل).",
+      duplicateIdError: "هذا الرقم الجامعي مسجل بالفعل في النظام.",
+      generalError: "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.",
       successMsg: "تم إنشاء الحساب بنجاح!"
     }
   };
@@ -62,7 +70,6 @@ const Signup = () => {
 
   const handleStudentIdChange = (e) => {
     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-    // منع البدء بصفر (يبدأ من 1-9)
     if (numericValue.startsWith('0')) return;
     setStudentId(numericValue);
   };
@@ -84,7 +91,6 @@ const Signup = () => {
       setErrorMsg(t.matchError);
       return;
     }
-    // 👈 التعديل هنا: فحص طول الرقم الجامعي ليكون 6 أرقام على الأقل
     if (!studentId || studentId.length < 6) {
       setErrorMsg(t.idLengthError);
       return;
@@ -105,8 +111,15 @@ const Signup = () => {
         }
       });
 
+      // التعامل الذكي مع أخطاء الـ Auth
       if (authError) {
-        setErrorMsg(authError.message);
+        if (authError.message.includes("User already registered")) {
+          setErrorMsg(t.emailInUseError);
+        } else if (authError.message.includes("Password should be at least")) {
+          setErrorMsg(t.weakPasswordError);
+        } else {
+          setErrorMsg(t.generalError + " (" + authError.message + ")");
+        }
         setLoading(false);
         return;
       }
@@ -124,8 +137,14 @@ const Signup = () => {
             }
           ]);
 
+        // التعامل الذكي مع أخطاء قاعدة البيانات
         if (dbError) {
-          setErrorMsg(t.dbError);
+          // رمز 23505 في قاعدة البيانات يعني أن القيمة مكررة (Unique Constraint)
+          if (dbError.code === '23505') {
+            setErrorMsg(t.duplicateIdError);
+          } else {
+            setErrorMsg(t.generalError);
+          }
           setLoading(false);
           return;
         }
@@ -134,7 +153,7 @@ const Signup = () => {
         navigate('/login');
       }
     } catch (err) {
-      setErrorMsg("حدث خطأ في الاتصال بالخادم.");
+      setErrorMsg(t.generalError);
     } finally {
       setLoading(false);
     }
@@ -176,7 +195,7 @@ const Signup = () => {
           </h2>
 
           {errorMsg && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-600 text-sm font-bold rounded-xl text-center">
+            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-600 text-sm font-bold rounded-xl text-center shadow-sm">
               {errorMsg}
             </div>
           )}
