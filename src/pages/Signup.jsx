@@ -30,7 +30,6 @@ const Signup = () => {
       gmailError: "Email must end with @gmail.com only.",
       matchError: "Passwords do not match.",
       idLengthError: "Student ID must be at least 6 digits.",
-      // أخطاء ذكية جديدة بالإنجليزية
       emailInUseError: "This email is already registered. Please login.",
       weakPasswordError: "Password must be at least 6 characters.",
       duplicateIdError: "This Student ID is already registered in our system.",
@@ -51,7 +50,6 @@ const Signup = () => {
       gmailError: "يجب أن ينتهي البريد الإلكتروني بـ @gmail.com فقط.",
       matchError: "كلمتا المرور غير متطابقتين.",
       idLengthError: "يجب أن يتكون الرقم الجامعي من 6 أرقام على الأقل.",
-      // أخطاء ذكية جديدة بالعربية
       emailInUseError: "هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول.",
       weakPasswordError: "كلمة المرور ضعيفة (يجب أن تتكون من 6 أحرف على الأقل).",
       duplicateIdError: "هذا الرقم الجامعي مسجل بالفعل في النظام.",
@@ -111,11 +109,12 @@ const Signup = () => {
         }
       });
 
-      // التعامل الذكي مع أخطاء الـ Auth
+      // التعامل الذكي مع أخطاء الـ Auth (تكرار الإيميل أو ضعف كلمة المرور)
       if (authError) {
-        if (authError.message.includes("User already registered")) {
+        const msg = authError.message.toLowerCase();
+        if (msg.includes("already") || msg.includes("registered") || msg.includes("in use")) {
           setErrorMsg(t.emailInUseError);
-        } else if (authError.message.includes("Password should be at least")) {
+        } else if (msg.includes("password") || msg.includes("at least")) {
           setErrorMsg(t.weakPasswordError);
         } else {
           setErrorMsg(t.generalError + " (" + authError.message + ")");
@@ -137,11 +136,14 @@ const Signup = () => {
             }
           ]);
 
-        // التعامل الذكي مع أخطاء قاعدة البيانات
+        // التعامل الذكي مع أخطاء قاعدة البيانات (تكرار الرقم الجامعي)
         if (dbError) {
-          // رمز 23505 في قاعدة البيانات يعني أن القيمة مكررة (Unique Constraint)
           if (dbError.code === '23505') {
-            setErrorMsg(t.duplicateIdError);
+            if (dbError.message && dbError.message.toLowerCase().includes('email')) {
+              setErrorMsg(t.emailInUseError);
+            } else {
+              setErrorMsg(t.duplicateIdError);
+            }
           } else {
             setErrorMsg(t.generalError);
           }
