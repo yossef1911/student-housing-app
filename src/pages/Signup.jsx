@@ -37,10 +37,10 @@ const Signup = () => {
       weakPasswordError: "Password must be at least 6 characters.",
       duplicateIdError: "This Student ID is already registered in our system.",
       generalError: "An unexpected error occurred. Please try again.",
-      // 👈 نصوص نافذة النجاح
-      successTitle: "Welcome Aboard! 🎉",
-      successText: "Your account has been created successfully. You can now login to book your room.",
-      btnGoLogin: "Go to Login"
+      // 👈 نصوص نافذة النجاح الجديدة
+      successTitle: "Registration Successful! 🎓",
+      successText: "Welcome to UniHome. Your student account is ready. Please log in to start booking your accommodation.",
+      btnGoLogin: "Login Now"
     },
     ar: {
       login: "دخول", toggleLang: "English",
@@ -60,10 +60,10 @@ const Signup = () => {
       weakPasswordError: "كلمة المرور ضعيفة (يجب أن تتكون من 6 أحرف على الأقل).",
       duplicateIdError: "هذا الرقم الجامعي مسجل بالفعل في النظام.",
       generalError: "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.",
-      // 👈 نصوص نافذة النجاح
-      successTitle: "أهلاً بك معنا! 🎉",
-      successText: "تم إنشاء حسابك بنجاح. يمكنك الآن تسجيل الدخول لحجز غرفتك.",
-      btnGoLogin: "الذهاب لتسجيل الدخول"
+      // 👈 نصوص نافذة النجاح الجديدة
+      successTitle: "تم التسجيل بنجاح! 🎓",
+      successText: "مرحباً بك في سكن UniHome. حسابك الجامعي جاهز الآن. يرجى تسجيل الدخول للبدء في حجز غرفتك.",
+      btnGoLogin: "تسجيل الدخول الآن"
     }
   };
 
@@ -169,7 +169,6 @@ const Signup = () => {
   return (
     <div className={`min-h-screen relative flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
-      {/* 👈 نافذة النجاح المنبثقة الخضراء والأنيقة */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in-down text-center p-8 border-t-8 border-green-500">
