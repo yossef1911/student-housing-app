@@ -10,8 +10,10 @@ const Rooms = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [studentData, setStudentData] = useState(null);
+  
+  // 👈 إضافة حالة جديدة لمراقبة هل يمتلك الطالب حجزاً أم لا
+  const [hasActiveBooking, setHasActiveBooking] = useState(false); 
 
-  // نظام النوافذ المنبثقة (Modals)
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, room: null });
 
   const t = {
@@ -24,11 +26,13 @@ const Rooms = () => {
       booked: "Booked",
       backHome: "Back to Home",
       toggleLang: "عربي",
-      // نصوص المودال
       modalLoginTitle: "Login Required",
       modalLoginText: "You must login as a student first to book a room.",
       modalBlockTitle: "Booking Suspended 🚫",
-      modalBlockText: "Your account is currently suspended from booking. Please contact the administration for more details.",
+      modalBlockText: "Your account is currently suspended from booking. Please contact administration.",
+      // 👈 نصوص المودال الجديد
+      modalAlreadyBookedTitle: "Active Booking Exists", 
+      modalAlreadyBookedText: "You already have an active room booking. You can only book one room at a time.", 
       modalConfirmTitle: "Confirm Booking",
       modalConfirmText: "Are you sure you want to book room number",
       btnCancel: "Cancel",
@@ -46,11 +50,13 @@ const Rooms = () => {
       booked: "محجوزة",
       backHome: "الرئيسية",
       toggleLang: "English",
-      // نصوص المودال
       modalLoginTitle: "تنبيه تسجيل الدخول",
       modalLoginText: "يجب عليك تسجيل الدخول بحساب طالب أولاً لتتمكن من الحجز.",
       modalBlockTitle: "عذراً، حسابك موقوف 🚫",
       modalBlockText: "حسابك غير مصرح له بالحجز حالياً. يرجى مراجعة إدارة السكن الجامعي لمزيد من التفاصيل.",
+      // 👈 نصوص المودال الجديد
+      modalAlreadyBookedTitle: "لديك حجز نشط بالفعل", 
+      modalAlreadyBookedText: "عذراً، لا يمكنك حجز أكثر من غرفة في نفس الوقت. يرجى مراجعة صفحة حجوزاتي.", 
       modalConfirmTitle: "تأكيد الحجز",
       modalConfirmText: "هل أنت متأكد من رغبتك في حجز الغرفة رقم",
       btnCancel: "إلغاء",
@@ -64,16 +70,29 @@ const Rooms = () => {
   useEffect(() => {
     const fetchRoomsAndUser = async () => {
       try {
-        // 1. جلب الغرف
         const { data: roomsData } = await supabase.from('rooms').select('*').order('room_id', { ascending: true });
         if (roomsData) setRooms(roomsData);
 
-        // 2. التحقق من المستخدم الحالي وجلب بيانات الطالب (بما فيها حالة الحظر)
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           setUser(session.user);
           const { data: student } = await supabase.from('students').select('*').eq('auth_id', session.user.id).single();
-          if (student) setStudentData(student);
+          
+          if (student) {
+            setStudentData(student);
+            
+            // 👈 جلب الحجوزات النشطة الخاصة بهذا الطالب
+            const { data: bookings } = await supabase
+              .from('bookings')
+              .select('*')
+              .eq('student_id', student.student_id)
+              .neq('booking_status', 'canceled');
+            
+            // إذا كان لديه أي حجز غير ملغي، نمنعه من الحجز الجديد
+            if (bookings && bookings.length > 0) {
+              setHasActiveBooking(true);
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -86,41 +105,41 @@ const Rooms = () => {
   }, []);
 
   const handleBookingClick = (room) => {
-    // 1. إذا لم يكن مسجلاً للدخول -> مودال تسجيل الدخول
     if (!user || !studentData) {
       setModalConfig({ isOpen: true, type: 'login', room: null });
       return;
     }
 
-    // 2. إذا كان الطالب محظوراً -> مودال الحظر الأحمر
     if (studentData.is_blacklisted) {
       setModalConfig({ isOpen: true, type: 'blocked', room: null });
       return;
     }
 
-    // 3. إذا كان كل شيء سليماً -> مودال تأكيد الحجز
+    // 👈 التحقق من وجود حجز نشط قبل فتح نافذة التأكيد
+    if (hasActiveBooking) {
+      setModalConfig({ isOpen: true, type: 'alreadyBooked', room: null });
+      return;
+    }
+
     setModalConfig({ isOpen: true, type: 'confirm', room: room });
   };
 
   const executeBooking = async () => {
     const { room } = modalConfig;
     try {
-      // حساب العام الدراسي تلقائياً (مثال: 2026/2027)
       const currentYear = new Date().getFullYear();
       const academicYear = `${currentYear}/${currentYear + 1}`;
 
-      // إرسال الحجز مع إضافة عمود academic_year الإجباري
       const { error: bookingError } = await supabase.from('bookings').insert([{
         student_id: studentData.student_id,
         room_id: room.room_id,
         payment_status: 'unpaid',
         booking_status: 'pending',
-        academic_year: academicYear // 👈 هذا هو السطر الذي حل المشكلة!
+        academic_year: academicYear
       }]);
 
       if (bookingError) throw bookingError;
 
-      // تحديث حالة الغرفة لتصبح محجوزة
       const { error: roomError } = await supabase.from('rooms').update({ status: 'booked' }).eq('room_id', room.room_id);
       if (roomError) throw roomError;
 
@@ -138,27 +157,25 @@ const Rooms = () => {
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
-      {/* ================== شاشة المودال (النافذة المنبثقة) ================== */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
             
-            {/* عنوان المودال */}
-            <div className={`p-6 border-b border-gray-100 ${modalConfig.type === 'blocked' ? 'bg-red-50' : 'bg-white'}`}>
-              <h3 className={`text-xl font-extrabold ${modalConfig.type === 'blocked' ? 'text-red-600' : 'text-[#1b2a47]'}`}>
+            <div className={`p-6 border-b border-gray-100 ${modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' ? 'bg-red-50' : 'bg-white'}`}>
+              <h3 className={`text-xl font-extrabold ${modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' ? 'text-red-600' : 'text-[#1b2a47]'}`}>
                 {modalConfig.type === 'login' ? t.modalLoginTitle : 
-                 modalConfig.type === 'blocked' ? t.modalBlockTitle : t.modalConfirmTitle}
+                 modalConfig.type === 'blocked' ? t.modalBlockTitle : 
+                 modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedTitle : t.modalConfirmTitle}
               </h3>
             </div>
             
-            {/* محتوى المودال */}
             <div className="p-6 text-gray-600 font-bold text-lg leading-relaxed">
               {modalConfig.type === 'login' ? t.modalLoginText : 
                modalConfig.type === 'blocked' ? t.modalBlockText : 
+               modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedText :
                `${t.modalConfirmText} (${modalConfig.room?.room_id})؟`}
             </div>
 
-            {/* أزرار المودال */}
             <div className="p-4 bg-gray-50 flex justify-end gap-3">
               <button 
                 onClick={() => setModalConfig({ isOpen: false, type: null, room: null })} 
@@ -183,7 +200,6 @@ const Rooms = () => {
         </div>
       )}
 
-      {/* الشريط العلوي */}
       <nav className="bg-white px-4 md:px-12 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <img src={logo} alt="Logo" className="h-10" />
@@ -199,7 +215,6 @@ const Rooms = () => {
         </div>
       </nav>
 
-      {/* محتوى الغرف */}
       <div className="flex-grow max-w-7xl mx-auto px-4 py-12 w-full">
         <h1 className="text-3xl md:text-5xl font-extrabold text-[#1b2a47] mb-12 text-center">
           {t.title}
@@ -214,7 +229,6 @@ const Rooms = () => {
                 <div className="relative h-48">
                   <img src={room.image_url || "https://images.unsplash.com/photo-1522771731478-44eb10e5c836?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"} alt="Room" className="w-full h-full object-cover" />
                   
-                  {/* شارة الحالة (Badge) */}
                   <div className="absolute top-3 right-3 rtl:left-3 rtl:right-auto">
                     {room.status === 'available' ? (
                       <span className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-xs shadow-sm">متاحة</span>
