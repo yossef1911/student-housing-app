@@ -125,7 +125,6 @@ const AdminDashboard = () => {
           setAllBookings(bookingsData);
           if(roomsData) {
               bookingsData.forEach(b => {
-                  // حساب الإيرادات للحجوزات المدفوعة والغير ملغية فقط
                   if(b.payment_status === 'paid' && b.booking_status !== 'canceled') {
                       const roomPrice = roomsData.find(r => r.room_id === b.room_id)?.price || 0;
                       tempRevenue += roomPrice;
@@ -186,30 +185,37 @@ const AdminDashboard = () => {
       const booking = allBookings.find(b => b.booking_id === bookingId);
       const newPaymentStatus = booking.payment_status === 'paid' ? 'refunded' : booking.payment_status;
 
-      // 1. تحديث الحجز ليصبح ملغي بدلاً من حذفه نهائياً
+      // 1. محاولة تحديث الحجز وتغييره إلى ملغي
       const { error: bookingError } = await supabase.from('bookings').update({ 
         booking_status: 'canceled',
         payment_status: newPaymentStatus
       }).eq('booking_id', bookingId);
-      if (bookingError) throw bookingError;
 
-      // 2. تحديث حالة الغرفة لتصبح صيانة
+      // 2. معالجة الخطأ بذكاء إذا رفضت قاعدة البيانات الكلمات الجديدة
+      if (bookingError) {
+        console.error("Supabase Error:", bookingError);
+        alert("قاعدة البيانات ترفض حالة الإلغاء بسبب القيود الصارمة (Constraints).\n\nيرجى فتح الـ SQL Editor في Supabase وتنفيذ الكود الذي أرسلته لك لحل المشكلة نهائياً.");
+        closeModal();
+        return;
+      }
+
+      // 3. تحديث حالة الغرفة لتصبح صيانة
       const { error: roomError } = await supabase.from('rooms').update({ status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() }).eq('room_id', roomId);
       if (roomError) throw roomError;
 
-      // خصم من الإيرادات إذا كان مدفوعاً
+      // 4. خصم من الإيرادات إذا كان مدفوعاً
       if(booking.payment_status === 'paid') {
           const roomPrice = rooms.find(r => r.room_id === roomId)?.price || 0;
           setTotalRevenue(prev => prev - roomPrice);
       }
 
-      // 3. تحديث الواجهة
+      // 5. تحديث الواجهة
       setAllBookings(allBookings.map(b => b.booking_id === bookingId ? { ...b, booking_status: 'canceled', payment_status: newPaymentStatus } : b));
       setRooms(rooms.map(r => r.room_id === roomId ? { ...r, status: 'maintenance', maintenance_end: maintenanceEndDate.toISOString() } : r));
       
       closeModal();
     } catch (error) {
-      alert("حدث خطأ.");
+      alert("حدث خطأ عام: " + error.message);
     }
   };
 
@@ -239,7 +245,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // دالة تعديل السعر
   const executeEditPrice = async () => {
     const { roomId } = modalConfig.data;
     const newPrice = Number(modalInput);
