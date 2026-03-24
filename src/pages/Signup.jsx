@@ -15,6 +15,9 @@ const Signup = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 👈 إضافة حالة جديدة لإظهار نافذة النجاح
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   const content = {
     en: {
       login: "Login", toggleLang: "عربي",
@@ -34,7 +37,10 @@ const Signup = () => {
       weakPasswordError: "Password must be at least 6 characters.",
       duplicateIdError: "This Student ID is already registered in our system.",
       generalError: "An unexpected error occurred. Please try again.",
-      successMsg: "Account created successfully!"
+      // 👈 نصوص نافذة النجاح
+      successTitle: "Welcome Aboard! 🎉",
+      successText: "Your account has been created successfully. You can now login to book your room.",
+      btnGoLogin: "Go to Login"
     },
     ar: {
       login: "دخول", toggleLang: "English",
@@ -54,7 +60,10 @@ const Signup = () => {
       weakPasswordError: "كلمة المرور ضعيفة (يجب أن تتكون من 6 أحرف على الأقل).",
       duplicateIdError: "هذا الرقم الجامعي مسجل بالفعل في النظام.",
       generalError: "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.",
-      successMsg: "تم إنشاء الحساب بنجاح!"
+      // 👈 نصوص نافذة النجاح
+      successTitle: "أهلاً بك معنا! 🎉",
+      successText: "تم إنشاء حسابك بنجاح. يمكنك الآن تسجيل الدخول لحجز غرفتك.",
+      btnGoLogin: "الذهاب لتسجيل الدخول"
     }
   };
 
@@ -98,7 +107,6 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      // 1. إنشاء الحساب في قسم Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -109,7 +117,6 @@ const Signup = () => {
         }
       });
 
-      // التعامل الذكي مع أخطاء الـ Auth (تكرار الإيميل أو ضعف كلمة المرور)
       if (authError) {
         const msg = authError.message.toLowerCase();
         if (msg.includes("already") || msg.includes("registered") || msg.includes("in use")) {
@@ -123,7 +130,6 @@ const Signup = () => {
         return;
       }
 
-      // 2. إدخال بيانات الطالب في جدول students
       if (authData.user) {
         const { error: dbError } = await supabase
           .from('students')
@@ -136,7 +142,6 @@ const Signup = () => {
             }
           ]);
 
-        // التعامل الذكي مع أخطاء قاعدة البيانات (تكرار الرقم الجامعي)
         if (dbError) {
           if (dbError.code === '23505') {
             if (dbError.message && dbError.message.toLowerCase().includes('email')) {
@@ -151,8 +156,8 @@ const Signup = () => {
           return;
         }
 
-        alert(t.successMsg);
-        navigate('/login');
+        // 👈 بدلاً من استخدام الـ alert والانتقال المباشر، نعرض مودال النجاح
+        setShowSuccessModal(true);
       }
     } catch (err) {
       setErrorMsg(t.generalError);
@@ -164,6 +169,22 @@ const Signup = () => {
   return (
     <div className={`min-h-screen relative flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
+      {/* 👈 نافذة النجاح المنبثقة الخضراء والأنيقة */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in-down text-center p-8 border-t-8 border-green-500">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h3 className="text-2xl font-extrabold text-[#1b2a47] mb-2">{t.successTitle}</h3>
+            <p className="text-gray-500 font-bold mb-8">{t.successText}</p>
+            <button onClick={() => navigate('/login')} className="w-full py-3 bg-[#5ca393] text-white font-bold rounded-xl hover:bg-[#458b7c] shadow-md transition-colors">
+              {t.btnGoLogin}
+            </button>
+          </div>
+        </div>
+      )}
+
       <nav className="fixed top-0 left-0 w-full bg-white px-4 md:px-12 py-3 flex justify-between items-center z-50 shadow-sm" dir="ltr">
         <div className="flex items-center gap-2 md:gap-3 cursor-pointer shrink-0" onClick={() => navigate('/')}>
           <img src={logo} alt="UniHome Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 object-contain" />

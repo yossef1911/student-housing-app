@@ -11,10 +11,10 @@ const Rooms = () => {
   const [user, setUser] = useState(null);
   const [studentData, setStudentData] = useState(null);
   
-  // 👈 إضافة حالة جديدة لمراقبة هل يمتلك الطالب حجزاً أم لا
   const [hasActiveBooking, setHasActiveBooking] = useState(false); 
 
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, room: null });
+  // 👈 تمت إضافة errorMessage هنا
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, room: null, errorMessage: '' });
 
   const t = {
     en: {
@@ -30,16 +30,19 @@ const Rooms = () => {
       modalLoginText: "You must login as a student first to book a room.",
       modalBlockTitle: "Booking Suspended 🚫",
       modalBlockText: "Your account is currently suspended from booking. Please contact administration.",
-      // 👈 نصوص المودال الجديد
       modalAlreadyBookedTitle: "Active Booking Exists", 
       modalAlreadyBookedText: "You already have an active room booking. You can only book one room at a time.", 
       modalConfirmTitle: "Confirm Booking",
       modalConfirmText: "Are you sure you want to book room number",
+      // 👈 نصوص النجاح والخطأ
+      modalSuccessTitle: "Success! 🎉",
+      modalSuccessText: "Room booked successfully!",
+      modalErrorTitle: "Booking Error ❌",
       btnCancel: "Cancel",
       btnConfirm: "Confirm Booking",
       btnLogin: "Go to Login",
       btnOkay: "I Understand",
-      successBooking: "Room booked successfully!"
+      btnGoToBookings: "Go to My Bookings"
     },
     ar: {
       title: "الغرف المتاحة",
@@ -54,16 +57,19 @@ const Rooms = () => {
       modalLoginText: "يجب عليك تسجيل الدخول بحساب طالب أولاً لتتمكن من الحجز.",
       modalBlockTitle: "عذراً، حسابك موقوف 🚫",
       modalBlockText: "حسابك غير مصرح له بالحجز حالياً. يرجى مراجعة إدارة السكن الجامعي لمزيد من التفاصيل.",
-      // 👈 نصوص المودال الجديد
       modalAlreadyBookedTitle: "لديك حجز نشط بالفعل", 
       modalAlreadyBookedText: "عذراً، لا يمكنك حجز أكثر من غرفة في نفس الوقت. يرجى مراجعة صفحة حجوزاتي.", 
       modalConfirmTitle: "تأكيد الحجز",
       modalConfirmText: "هل أنت متأكد من رغبتك في حجز الغرفة رقم",
+      // 👈 نصوص النجاح والخطأ
+      modalSuccessTitle: "نجاح! 🎉",
+      modalSuccessText: "تم حجز الغرفة بنجاح!",
+      modalErrorTitle: "خطأ في الحجز ❌",
       btnCancel: "إلغاء",
       btnConfirm: "تأكيد الحجز",
       btnLogin: "الذهاب لتسجيل الدخول",
       btnOkay: "حسناً، فهمت",
-      successBooking: "تم حجز الغرفة بنجاح!"
+      btnGoToBookings: "الذهاب لحجوزاتي"
     }
   }[lang];
 
@@ -80,15 +86,12 @@ const Rooms = () => {
           
           if (student) {
             setStudentData(student);
-            
-            // 👈 جلب الحجوزات النشطة الخاصة بهذا الطالب
             const { data: bookings } = await supabase
               .from('bookings')
               .select('*')
               .eq('student_id', student.student_id)
               .neq('booking_status', 'canceled');
             
-            // إذا كان لديه أي حجز غير ملغي، نمنعه من الحجز الجديد
             if (bookings && bookings.length > 0) {
               setHasActiveBooking(true);
             }
@@ -105,23 +108,11 @@ const Rooms = () => {
   }, []);
 
   const handleBookingClick = (room) => {
-    if (!user || !studentData) {
-      setModalConfig({ isOpen: true, type: 'login', room: null });
-      return;
-    }
+    if (!user || !studentData) return setModalConfig({ isOpen: true, type: 'login', room: null, errorMessage: '' });
+    if (studentData.is_blacklisted) return setModalConfig({ isOpen: true, type: 'blocked', room: null, errorMessage: '' });
+    if (hasActiveBooking) return setModalConfig({ isOpen: true, type: 'alreadyBooked', room: null, errorMessage: '' });
 
-    if (studentData.is_blacklisted) {
-      setModalConfig({ isOpen: true, type: 'blocked', room: null });
-      return;
-    }
-
-    // 👈 التحقق من وجود حجز نشط قبل فتح نافذة التأكيد
-    if (hasActiveBooking) {
-      setModalConfig({ isOpen: true, type: 'alreadyBooked', room: null });
-      return;
-    }
-
-    setModalConfig({ isOpen: true, type: 'confirm', room: room });
+    setModalConfig({ isOpen: true, type: 'confirm', room: room, errorMessage: '' });
   };
 
   const executeBooking = async () => {
@@ -143,29 +134,37 @@ const Rooms = () => {
       const { error: roomError } = await supabase.from('rooms').update({ status: 'booked' }).eq('room_id', room.room_id);
       if (roomError) throw roomError;
 
-      alert(t.successBooking);
-      setModalConfig({ isOpen: false, type: null, room: null });
-      navigate('/my-bookings');
+      // 👈 بدلاً من alert: إظهار مودال النجاح
+      setModalConfig({ isOpen: true, type: 'success', room: null, errorMessage: '' });
 
     } catch (error) {
       console.error("Booking error:", error);
-      alert("حدث خطأ أثناء الحجز: " + (error.message || "تأكد من البيانات"));
-      setModalConfig({ isOpen: false, type: null, room: null });
+      // 👈 بدلاً من alert: إظهار مودال الخطأ
+      setModalConfig({ isOpen: true, type: 'error', room: null, errorMessage: error.message || "تأكد من البيانات" });
     }
   };
 
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
+      {/* 👈 تطوير المودال ليدعم النجاح والخطأ */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
             
-            <div className={`p-6 border-b border-gray-100 ${modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' ? 'bg-red-50' : 'bg-white'}`}>
-              <h3 className={`text-xl font-extrabold ${modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' ? 'text-red-600' : 'text-[#1b2a47]'}`}>
+            <div className={`p-6 border-b border-gray-100 ${
+              modalConfig.type === 'success' ? 'bg-green-50' : 
+              (modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' || modalConfig.type === 'error') ? 'bg-red-50' : 'bg-white'
+            }`}>
+              <h3 className={`text-xl font-extrabold ${
+                modalConfig.type === 'success' ? 'text-green-600' : 
+                (modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' || modalConfig.type === 'error') ? 'text-red-600' : 'text-[#1b2a47]'
+              }`}>
                 {modalConfig.type === 'login' ? t.modalLoginTitle : 
                  modalConfig.type === 'blocked' ? t.modalBlockTitle : 
-                 modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedTitle : t.modalConfirmTitle}
+                 modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedTitle : 
+                 modalConfig.type === 'success' ? t.modalSuccessTitle :
+                 modalConfig.type === 'error' ? t.modalErrorTitle : t.modalConfirmTitle}
               </h3>
             </div>
             
@@ -173,16 +172,20 @@ const Rooms = () => {
               {modalConfig.type === 'login' ? t.modalLoginText : 
                modalConfig.type === 'blocked' ? t.modalBlockText : 
                modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedText :
+               modalConfig.type === 'success' ? t.modalSuccessText :
+               modalConfig.type === 'error' ? modalConfig.errorMessage :
                `${t.modalConfirmText} (${modalConfig.room?.room_id})؟`}
             </div>
 
             <div className="p-4 bg-gray-50 flex justify-end gap-3">
-              <button 
-                onClick={() => setModalConfig({ isOpen: false, type: null, room: null })} 
-                className="px-5 py-2.5 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                {modalConfig.type === 'confirm' ? t.btnCancel : (modalConfig.type === 'login' ? t.btnCancel : t.btnOkay)}
-              </button>
+              {modalConfig.type !== 'success' && (
+                <button 
+                  onClick={() => setModalConfig({ isOpen: false, type: null, room: null, errorMessage: '' })} 
+                  className="px-5 py-2.5 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  {modalConfig.type === 'confirm' ? t.btnCancel : (modalConfig.type === 'login' ? t.btnCancel : t.btnOkay)}
+                </button>
+              )}
               
               {modalConfig.type === 'login' && (
                 <button onClick={() => navigate('/login')} className="px-5 py-2.5 bg-[#1b2a47] text-white font-bold rounded-lg hover:bg-[#2a406b] transition-colors shadow-md">
@@ -193,6 +196,12 @@ const Rooms = () => {
               {modalConfig.type === 'confirm' && (
                 <button onClick={executeBooking} className="px-5 py-2.5 bg-[#5ca393] text-white font-bold rounded-lg hover:bg-[#458b7c] transition-colors shadow-md">
                   {t.btnConfirm}
+                </button>
+              )}
+
+              {modalConfig.type === 'success' && (
+                <button onClick={() => { setModalConfig({ isOpen: false }); navigate('/my-bookings'); }} className="px-5 py-2.5 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-colors shadow-md w-full">
+                  {t.btnGoToBookings}
                 </button>
               )}
             </div>
