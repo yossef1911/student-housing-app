@@ -1,39 +1,21 @@
-// بنجيب الأدوات الأساسية من React (مساحات التخزين والدوال اللي بتشتغل أول ما الصفحة تفتح).
 import React, { useState, useEffect } from 'react';
-// بنجيب أداة التنقل عشان لو حبينا ننقل الطالب لصفحة تسجيل الدخول أو حجوزاته.
 import { useNavigate } from 'react-router-dom';
-// بنجيب أداة الاتصال بقاعدة البيانات بتاعتنا.
 import { supabase } from '../services/supabaseClient';
-// لوجو الموقع.
 import logo from '../assets/logo.png';
 
-// الدالة أو المكون الأساسي لصفحة "الغرف المتاحة" (Rooms)
+// المكون الرئيسي لصفحة استعراض الغرف المتاحة وإجراء الحجوزات
 const Rooms = () => {
-  // بنجهز أداة الـ navigate.
   const navigate = useNavigate();
-  
-  // مخزن لحفظ اللغة الحالية (الافتراضي 'en').
   const [lang, setLang] = useState('en');
-  // مخزن لحفظ قائمة الغرف اللي هنجيبها من قاعدة البيانات.
   const [rooms, setRooms] = useState([]);
-  // مخزن لحالة التحميل، بيبقى true لحد ما البيانات تيجي عشان نعرض كلمة "جاري التحميل".
   const [loading, setLoading] = useState(true);
   
-  // مخزن هنحط فيه الجلسة (session) بتاعت اليوزر اللي مسجل دخول.
   const [user, setUser] = useState(null);
-  // مخزن هنحط فيه بيانات الطالب نفسه (زي الـ student_id بتاعه).
   const [studentData, setStudentData] = useState(null);
-  
-  // مخزن عشان نعرف هل الطالب ده عنده حجز شغال دلوقتي ولا لأ؟ (عشان نمنعه يحجز غرفتين في نفس الوقت).
   const [hasActiveBooking, setHasActiveBooking] = useState(false); 
 
-  // ده مخزن للمودال (النافذة المنبثقة اللي بتظهر في نص الشاشة).
-  // بنشيل فيه: هي مفتوحة ولا مقفولة (isOpen)؟، نوعها إيه (login, blocked, confirm, success, error)؟، 
-  // الغرفة اللي الطالب اختارها (room)، ولو فيه رسالة خطأ معينة (errorMessage).
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, room: null, errorMessage: '' });
 
-  // ده قاموس الترجمة بتاع الصفحة.
-  // بيختار القسم المناسب (عربي ولا إنجليزي) بناءً على قيمة مخزن lang.
   const t = {
     en: {
       title: "Available Rooms",
@@ -89,47 +71,36 @@ const Rooms = () => {
     }
   }[lang];
 
-  // الـ useEffect دي بتشتغل مرة واحدة أول ما الطالب يفتح صفحة الغرف المتاحة.
+  // جلب الغرف المتاحة والتحقق من حالة الطالب (مسجل دخول، محظور، لديه حجز مسبق)
   useEffect(() => {
-    // دالة لجلب كل البيانات اللي محتاجينها.
     const fetchRoomsAndUser = async () => {
       try {
-        // 1. أول حاجة: بنروح نجيب كل الغرف من قاعدة البيانات ونرتبهم برقم الغرفة.
         const { data: roomsData } = await supabase.from('rooms').select('*').order('room_id', { ascending: true });
-        // وبنحفظ الغرف دي في مخزن الـ rooms.
         if (roomsData) setRooms(roomsData);
 
-        // 2. بنشوف هو فيه حد مسجل دخول دلوقتي ولا الطالب بيتصفح كزائر؟
         const { data: { session } } = await supabase.auth.getSession();
         
-        // لو مسجل دخول (الطالب ليه حساب مفتوح):
         if (session) {
-          setUser(session.user); // بنحفظ بيانات الجلسة.
-          
-          // بنجيب بيانات الطالب ده من جدول students عشان محتاجين الـ student_id بتاعه.
+          setUser(session.user);
           const { data: student } = await supabase.from('students').select('*').eq('auth_id', session.user.id).single();
           
           if (student) {
-            setStudentData(student); // بنحفظ بيانات الطالب.
+            setStudentData(student);
             
-            // بنعمل تشييك سريع: هل الطالب ده حاجز غرفة ومخلصش الترم؟
-            // فبنجيب كل حجوزاته اللي حالة الحجز بتاعها "مش ملغي" (يعني حجوزات نشطة).
             const { data: bookings } = await supabase
               .from('bookings')
               .select('*')
               .eq('student_id', student.student_id)
               .neq('booking_status', 'canceled');
             
-            // لو لقينا إن عنده حجز نشط فعلاً:
             if (bookings && bookings.length > 0) {
-              setHasActiveBooking(true); // بنعلم عليه إنه عنده حجز شغال، عشان نمنعه يحجز تاني.
+              setHasActiveBooking(true);
             }
           }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
-        // في الآخر بنقفل التحميل عشان الغرف تظهر.
         setLoading(false);
       }
     };
@@ -137,32 +108,23 @@ const Rooms = () => {
     fetchRoomsAndUser();
   }, []);
 
-  // الدالة دي بتشتغل لما الطالب يقرر يدوس على زرار "احجز الآن" على أي غرفة.
+  // معالجة ضغطة زر الحجز والتحقق من صلاحية الطالب قبل إظهار نافذة التأكيد
   const handleBookingClick = (room) => {
-    // 1. التفتيش الأول: لو هو زائر ومش مسجل دخول، بنطلعله نافذة بتقوله "لازم تسجل دخول أولاً".
     if (!user || !studentData) return setModalConfig({ isOpen: true, type: 'login', room: null, errorMessage: '' });
-    
-    // 2. التفتيش التاني: لو مسجل دخول بس الإدمن عامله حظر (Blacklist)، بنطلعله نافذة "حسابك موقوف".
     if (studentData.is_blacklisted) return setModalConfig({ isOpen: true, type: 'blocked', room: null, errorMessage: '' });
-    
-    // 3. التفتيش التالت: لو مسجل ومش محظور، بس هو أصلاً حاجز غرفة، بنقوله "لا يمكن حجز أكتر من غرفة".
     if (hasActiveBooking) return setModalConfig({ isOpen: true, type: 'alreadyBooked', room: null, errorMessage: '' });
 
-    // 4. لو عدى من كل ده على خير، بنطلعله نافذة "تأكيد الحجز" عشان يتأكد إنه عايز الغرفة دي.
     setModalConfig({ isOpen: true, type: 'confirm', room: room, errorMessage: '' });
   };
 
-  // دي الدالة الفعلية اللي بتنفذ عملية الحجز بعد ما الطالب يدوس "تأكيد" جوه النافذة.
+  // تنفيذ عملية الحجز الفعلية في قاعدة البيانات وتحديث حالة الغرفة
   const executeBooking = async () => {
-    const { room } = modalConfig; // بنجيب الغرفة اللي هو اختارها من المخزن بتاع المودال.
+    const { room } = modalConfig; 
     
     try {
-      // بنجهز السنة الدراسية الحالية (مثلاً 2024/2025).
       const currentYear = new Date().getFullYear();
       const academicYear = `${currentYear}/${currentYear + 1}`;
 
-      // 1. بنسجل حجز جديد للطالب في جدول الحجوزات (bookings).
-      // بنحطله إن الدفع لسه "غير مدفوع" والحالة "معلقة" لحد ما يدفع للإدارة.
       const { error: bookingError } = await supabase.from('bookings').insert([{
         student_id: studentData.student_id,
         room_id: room.room_id,
@@ -171,37 +133,26 @@ const Rooms = () => {
         academic_year: academicYear
       }]);
 
-      // لو حصل خطأ في الحجز (مثلاً النت فصل أو قاعدة البيانات رفضت)، ارمي الخطأ للـ catch.
       if (bookingError) throw bookingError;
 
-      // 2. بعد ما الحجز اتسجل، بنروح نغير حالة الغرفة دي في جدول الغرف ونخليها "محجوزة" (booked) عشان مفيش حد تاني يختارها.
       const { error: roomError } = await supabase.from('rooms').update({ status: 'booked' }).eq('room_id', room.room_id);
       if (roomError) throw roomError;
 
-      // 3. لو كل ده تم بنجاح، بنغير شكل المودال لنافذة خضرا بتقوله "تم الحجز بنجاح".
       setModalConfig({ isOpen: true, type: 'success', room: null, errorMessage: '' });
 
     } catch (error) {
       console.error("Booking error:", error);
-      // لو حصل خطأ، بنغير شكل المودال لنافذة حمرا بتعرض رسالة الخطأ.
       setModalConfig({ isOpen: true, type: 'error', room: null, errorMessage: error.message || "تأكد من البيانات" });
     }
   };
 
-  // =====================================================================
-  // واجهة المستخدم (الـ UI اللي الطالب بيشوفه)
-  // =====================================================================
   return (
-    // الغلاف الخارجي للصفحة.
     <div className={`min-h-screen bg-gray-50 flex flex-col ${lang === 'en' ? 'font-en' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
-      {/* ================== المودال (النافذة المنبثقة الذكية) ================== */}
-      {/* النافذة دي بتظهر بس لو modalConfig.isOpen كانت true */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-down">
             
-            {/* رأس المودال: لونه بيتغير (أخضر للنجاح، أحمر للأخطاء والحظر، وأبيض للتأكيد العادي) */}
             <div className={`p-6 border-b border-gray-100 ${
               modalConfig.type === 'success' ? 'bg-green-50' : 
               (modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' || modalConfig.type === 'error') ? 'bg-red-50' : 'bg-white'
@@ -210,7 +161,6 @@ const Rooms = () => {
                 modalConfig.type === 'success' ? 'text-green-600' : 
                 (modalConfig.type === 'blocked' || modalConfig.type === 'alreadyBooked' || modalConfig.type === 'error') ? 'text-red-600' : 'text-[#1b2a47]'
               }`}>
-                {/* بنختار العنوان الصح بناءً على نوع المودال المفتوح */}
                 {modalConfig.type === 'login' ? t.modalLoginTitle : 
                  modalConfig.type === 'blocked' ? t.modalBlockTitle : 
                  modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedTitle : 
@@ -219,20 +169,16 @@ const Rooms = () => {
               </h3>
             </div>
             
-            {/* جسم المودال اللي فيه التفاصيل أو رسالة الخطأ */}
             <div className="p-6 text-gray-600 font-bold text-lg leading-relaxed">
               {modalConfig.type === 'login' ? t.modalLoginText : 
                modalConfig.type === 'blocked' ? t.modalBlockText : 
                modalConfig.type === 'alreadyBooked' ? t.modalAlreadyBookedText :
                modalConfig.type === 'success' ? t.modalSuccessText :
                modalConfig.type === 'error' ? modalConfig.errorMessage :
-               // لو نوعه confirm (تأكيد الحجز) بنطبعله الجملة ومعاها رقم الغرفة
                `${t.modalConfirmText} (${modalConfig.room?.room_id})؟`}
             </div>
 
-            {/* زراير التحكم اللي تحت المودال */}
             <div className="p-4 bg-gray-50 flex justify-end gap-3">
-              {/* لو المودال مش شاشة "نجاح"، بنعرضله زرار للإلغاء أو التراجع يقفل المودال */}
               {modalConfig.type !== 'success' && (
                 <button 
                   onClick={() => setModalConfig({ isOpen: false, type: null, room: null, errorMessage: '' })} 
@@ -242,21 +188,18 @@ const Rooms = () => {
                 </button>
               )}
               
-              {/* لو المودال بيقوله "لازم تسجل دخول"، بنعرض زرار يوديه لصفحة الـ login */}
               {modalConfig.type === 'login' && (
                 <button onClick={() => navigate('/login')} className="px-5 py-2.5 bg-[#1b2a47] text-white font-bold rounded-lg hover:bg-[#2a406b] transition-colors shadow-md">
                   {t.btnLogin}
                 </button>
               )}
 
-              {/* لو المودال بيقوله "أكد الحجز"، بنعرض زرار أخضر بينفذ دالة executeBooking */}
               {modalConfig.type === 'confirm' && (
                 <button onClick={executeBooking} className="px-5 py-2.5 bg-[#5ca393] text-white font-bold rounded-lg hover:bg-[#458b7c] transition-colors shadow-md">
                   {t.btnConfirm}
                 </button>
               )}
 
-              {/* لو المودال "نجاح"، بنعرضله زرار واحد يقفل المودال ويوديه على صفحة "حجوزاتي" */}
               {modalConfig.type === 'success' && (
                 <button onClick={() => { setModalConfig({ isOpen: false }); navigate('/my-bookings'); }} className="px-5 py-2.5 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-colors shadow-md w-full">
                   {t.btnGoToBookings}
@@ -267,7 +210,6 @@ const Rooms = () => {
         </div>
       )}
 
-      {/* ================== الشريط العلوي العادي بتاع الصفحة ================== */}
       <nav className="bg-white px-4 md:px-12 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <img src={logo} alt="Logo" className="h-10" />
@@ -283,28 +225,21 @@ const Rooms = () => {
         </div>
       </nav>
 
-      {/* ================== قائمة الغرف (الشبكة اللي فيها الكروت) ================== */}
       <div className="flex-grow max-w-7xl mx-auto px-4 py-12 w-full">
         <h1 className="text-3xl md:text-5xl font-extrabold text-[#1b2a47] mb-12 text-center">
           {t.title}
         </h1>
 
-        {/* لو لسه بيحمل الداتا من قاعدة البيانات بنعرض رسالة جاري التحميل */}
         {loading ? (
           <div className="text-center text-xl font-bold text-[#5ca393] mt-20">جاري التحميل...</div>
         ) : (
-          // لو خلص تحميل، بنرسم شبكة (Grid) من الكروت لكل غرفة موجودة.
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {rooms.map((room) => (
-              // الكارت الواحد بتاع الغرفة.
               <div key={room.room_id} className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-shadow overflow-hidden flex flex-col border border-gray-100">
                 
-                {/* الجزء اللي فوق في الكارت (صورة الغرفة والحالة بتاعتها) */}
                 <div className="relative h-48">
-                  {/* صورة الغرفة أو صورة افتراضية لو مفيش */}
                   <img src={room.image_url || "https://images.unsplash.com/photo-1522771731478-44eb10e5c836?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"} alt="Room" className="w-full h-full object-cover" />
                   
-                  {/* بادج (علامة صغيرة) فوق الصورة بتبين الغرفة متاحة ولا لأ */}
                   <div className="absolute top-3 right-3 rtl:left-3 rtl:right-auto">
                     {room.status === 'available' ? (
                       <span className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-xs shadow-sm">متاحة</span>
@@ -316,7 +251,6 @@ const Rooms = () => {
                   </div>
                 </div>
 
-                {/* الجزء اللي تحت في الكارت (رقم الغرفة، السعر، وزرار الحجز) */}
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-2xl font-extrabold text-[#1b2a47]">{room.room_id}</span>
@@ -324,13 +258,9 @@ const Rooms = () => {
                   </div>
                   
                   <div className="mt-auto pt-4">
-                    {/* زرار "احجز الآن" */}
                     <button 
-                      // لما يدوس بنشغل الدالة اللي بتعمل تفتيش وتفتح المودال.
                       onClick={() => handleBookingClick(room)}
-                      // الزرار مقفول (مش شغال) لو الغرفة محجوزة أو في صيانة.
                       disabled={room.status !== 'available'}
-                      // شكل ولون الزرار بيتغير (شغال أزرق غامق، مقفول رمادي).
                       className={`w-full py-3 rounded-xl font-bold text-white transition-all shadow-md ${
                         room.status === 'available' 
                           ? 'bg-[#1b2a47] hover:bg-[#2a406b] hover:scale-[1.02]' 
@@ -350,5 +280,4 @@ const Rooms = () => {
   );
 };
 
-// بنصدر الصفحة عشان الموقع يشوفها.
 export default Rooms;
